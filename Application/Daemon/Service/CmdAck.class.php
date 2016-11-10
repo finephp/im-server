@@ -21,7 +21,6 @@ class CmdAck extends CmdBase {
      * @return \GenericCommand|bool
      */
     public function ackCommand($genericCmd){
-        echo __METHOD__."\r\n";
         $ackMessage = $genericCmd->getAckMessage();
         $cid = $ackMessage->getCid();
         //处理返回信息
@@ -43,14 +42,17 @@ class CmdAck extends CmdBase {
         $result = $msgModel->where($where)->save($msgModel->create(array(
             'unread'=>false,
         ),MongoModel::MODEL_UPDATE));
-        log_write($msgModel->_sql(),'update messageLogs');
-        log_write(print_r($result,true));
+        //log_write($msgModel->_sql(),'update messageLogs');
+        //log_write(print_r($result,true));
         //查找该对话的需要回执的消息，并通知发消息的那个人，说消息已经被收到啦
         $where['receipt'] = true;
         $msgDataArr = $msgModel->where($where)->select() or $msgData = array();
-        echo $msgModel->_sql(),'-',__METHOD__;
         //发消息
+        //只查在线之人
         foreach($msgDataArr as $msgData) {
+            if(!self::isOnline($msgData['from'])){
+                continue;
+            }
             $rcpMsg->setId($msgData['msgId']);
             $resp->setPeerId($msgData['from']);
             $this->pushClientQueue($resp);

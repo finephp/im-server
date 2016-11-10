@@ -39,22 +39,26 @@ abstract class CmdBase{
         return Db::MongoModel('conversation');
     }
     protected function encodeResp($resp){
-        $new_resp = $resp->serializeToString();
-        //这个地方要注意 todo 可能在web版中会有问题
-        //$new_resp .= pack('H*','EA0600');
-        if($this->noBinary) {
-            $new_resp = base64_encode($new_resp);
-        }
+        /**  todo debug
         ob_start();
         echo 'encodeResp:';
         $resp->dump();
         $respstr = ob_get_clean();
-        log_write($respstr);
+        //log_write($respstr);
         echo $respstr;
+         */
+        $new_resp = $resp->serializeToString();
+        //这个地方要注意 todo 可能在web版中会有问题
+        //$new_resp .= pack('H*','EA0600');
         return $new_resp;
     }
+
+    /**
+     * @param $data GenericCommand
+     * @return bool
+     */
     protected function pushClientQueue($data){
-        echo (__METHOD__);
+        echo (__METHOD__."\r\n");
         $data = $this->encodeResp($data);
         $redisService = RedisService::getInstance();
         $redisService->pushClientQueue($data);
@@ -75,5 +79,35 @@ abstract class CmdBase{
      */
     protected static function getTimestamp($date){
         return floor($date->sec*1000+($date->usec/1000));
+    }
+
+    /**
+     * 获取在线 session
+     * @param $m
+     * @return string[]
+     */
+    protected static function getOnlineSession($m){
+        return RedisService::getInstance()->getPeerIds($m);
+    }
+
+    protected static function isOnline($peerId){
+        return RedisService::getInstance()->isPeerIdExists($peerId);
+    }
+
+    /**
+     * @param $name
+     * @param $debug
+     * @param $color
+     */
+    protected static function debug($str,$title=''){
+        static $__debug_Closure;
+        if(is_object($str) && get_class($str) == 'Closure'){
+            $__debug_Closure = $str;
+            return;
+        }
+        if(empty($__debug_Closure)){
+            $__debug_Closure = debug_factory('');
+        }
+        call_user_func($__debug_Closure,$str,$title);
     }
 }

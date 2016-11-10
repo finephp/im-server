@@ -30,7 +30,6 @@ class CmdDirect extends CmdBase {
      * @return \GenericCommand|bool
      */
     public function directCommand($genericCmd,$other){
-        echo __METHOD__."\r\n";
         $peerId = $genericCmd->getPeerId();
         //注册用户
         $driectMessage = $genericCmd->getDirectMessage();
@@ -57,7 +56,6 @@ class CmdDirect extends CmdBase {
             $resp->setAckMessage($ackMsg);
             return $this->pushClientQueue($resp);
         }
-
         //插入消息数据表
         $messageModel = $this->_getMessageModel();
         $data = array(
@@ -68,34 +66,51 @@ class CmdDirect extends CmdBase {
             'createdAt' => $this->nowTime
         );
         $result = $messageModel->add($messageModel->create($data));
-        log_write($messageModel->_sql(),__METHOD__);
+        //log_write($messageModel->_sql(),__METHOD__);
         $msgId = $messageModel->getLastInsID();
-        //插入到对话中的所有对像
+        //插入到对话中的所有成员的记录
         $messageLogModel = $this->_getMessageLogsModel();
+        $data = array(
+            'convId' => $cid,
+            'msgId' => $msgId,
+            'from' => $genericCmd->getPeerId(),
+            'data' => $driectMessage->getMsg(),
+            'ackAt'=>null,
+            'receipt'=>$driectMessage->getR(),
+            'createdAt' => $this->nowTime,
+            'unread'=>true,
+            'fromIp'=>$other['ip']
+        );
+        $data = $messageLogModel->create($data);
+        $this->nowTime = $data['createdAt'];
+        //批量插入
+        $data_list = array();
         foreach($m as $to){
-            $data = array(
-                'convId' => $cid,
-                'msgId' => $msgId,
-                'from' => $genericCmd->getPeerId(),
-                'to' => $to,
-                'data' => $driectMessage->getMsg(),
-                'ackAt'=>null,
-                'receipt'=>$driectMessage->getR(),
-                'createdAt' => $this->nowTime,
-                'unread'=>true,
-                'fromIp'=>$other['ip']
-            );
-            $data = $messageLogModel->create($data);
-            //记录最后一条时间
-            $this->nowTime = $data['createdAt'];
-            //echo __METHOD__,':add_time:',self::getTimestamp($this->nowTime),"\r\n";
             //不要发送给自已
             if($to == $peerId){
                 continue;
             }
-            $result = $messageLogModel->add($data);
-            log_write($messageLogModel->_sql(),__METHOD__);
+            $data['to'] = $to;
+            $data_list[] = $data;
         }
+        if($data_list){
+            $result = $messageLogModel->addAll($data_list);
+        }
+        unset($data_list);
+        /*
+        foreach($m as $to){
+            //不要发送给自已
+            if($to == $peerId){
+                continue;
+            }
+            $data['to'] = $to;
+            //记录最后一条时间
+            $this->nowTime = $data['createdAt'];
+            //echo __METHOD__,':add_time:',self::getTimestamp($this->nowTime),"\r\n";
+            $result = $messageLogModel->add($data);
+            //log_write($messageLogModel->_sql(),__METHOD__);
+        }
+        */
         //更新对话最后一条消息时间
         $convModel = $this->_getConvModel();
         $convModel->where(array(
@@ -118,6 +133,8 @@ class CmdDirect extends CmdBase {
         $r = $driectMessage->getR();
         $this->pushClientQueue($resp);
         //广播到会话中所有人
+        //查询在线的人
+        $m = self::getOnlineSession($m);
         $this->sendDirect($genericCmd,$m,$msgId);
         return true;
     }
@@ -150,12 +167,6 @@ class CmdDirect extends CmdBase {
         }
     }
 
-    /**
-     * 回执
-     */
-    public function opRcp(){
-
-    }
     protected function _getMessageModel()
     {
         return Db::MongoModel('message');

@@ -46,7 +46,6 @@ class CmdSession extends CmdBase {
      * @return \GenericCommand|bool
      */
     public function open($genericCmd){
-        echo __METHOD__.":"."\r\n";
         //注册用户
         $fromPearId = $genericCmd->getPeerId() or $fromPearId = "guest_" . md5(time() . mt_rand(1, 10));
         //登录session
@@ -94,8 +93,7 @@ class CmdSession extends CmdBase {
                 'unread' => true,
                 //'ackAt'=>array('exists',true)
             ))->limit(10)->order('createdAt desc')->select();
-            echo $logsModel->_sql()."\r\n";
-            log_write($logsModel->_sql(),__METHOD__);
+            //log_write($logsModel->_sql(),__METHOD__);
             if($logsResult){
                 $logsResult = array_groupbykey($logsResult,'convId');
                 //响应未读消息
@@ -126,7 +124,6 @@ class CmdSession extends CmdBase {
      * @return \GenericCommand|bool
      */
     public function close($genericCmd){
-        echo "optype:close:"."\r\n";
         $resp = $genericCmd;
         $resp->setOp(OpType::closed);
         $this->pushClientQueue($resp);
@@ -136,11 +133,17 @@ class CmdSession extends CmdBase {
     }
 
     /**
+     * 查询在线用户 8
      * @param $genericCmd \GenericCommand
      */
     public function opQuery($genericCmd){
+        $genericCmd->setOp(OpType::query_result); //optype:8
+        $sessionPeerIds = $genericCmd->getSessionMessage()->getSessionPeerIds();
+        $onlineM = self::getOnlineSession($sessionPeerIds);
         $message = new \SessionCommand();
-        $message->appendOnlineSessionPeerIds($genericCmd->getPeerId());
+        foreach($onlineM as $peerId) {
+            $message->appendOnlineSessionPeerIds($peerId);
+        }
         $genericCmd->setSessionMessage($message);
         $this->pushClientQueue($genericCmd);
         return true;

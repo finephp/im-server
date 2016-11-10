@@ -4,6 +4,7 @@ use Daemon\Service\Db;
 use Daemon\Service\MongoModel;
 use Think\Controller;
 require_once WORKERMAN_PATH;
+//include_once (dirname(APP_PATH).'/server/pb_proto_message.php');
 if(!IS_CLI){
     die('NOT CLI');
 }
@@ -75,21 +76,32 @@ class TestController extends Controller {
     }
 
     public function testLogs(){
-        $model =  $model = Db::MongoModel('messageLogs');
-        $where = array(
-            'to'=>'54809720-e1c2-4758-9fd5-14ae6d6b6d3e'
+        $model =  $model = Db::MongoModel('conversation');
+        $data= array(
+            'm'=>array('pullAll',['wangtr','chensf'])
         );
-        $nowTime = new \MongoDate();
-        print_r($nowTime);
-        sleep(2);
-        $nowTime2 = new \MongoDate();
-        print_r($nowTime);
-        print_r($nowTime2);
-        $data = $model->create(array(
-            //'createdAt'=>$nowTime,
-            'taaa'=> time()
-        ));
-        print_r($data);
+        $result = $model->where(array(
+            '_id'=>'581c549c9b1eaf6a537b3e5c'
+        ))->save($data);
+        var_dump($model->_sql());
+        var_dump($result);
     }
 
+    public function echo_a(){
+        $this->debug(debug_factory('LC:Test','43;31m'));
+        $this->debug("aaaaaaaaaaaaaaaaa");
+        $this->debug("bbbbbbbbbbbbbbbbbb");
+    }
+
+    public function debug($str){
+        static $__debug_Closure;
+        if(is_object($str) && get_class($str) == 'Closure'){
+            $__debug_Closure = $str;
+            return;
+        }
+        if(empty($__debug_Closure)){
+            $__debug_Closure = debug_factory('');
+        }
+        call_user_func($__debug_Closure,$str);
+    }
 }

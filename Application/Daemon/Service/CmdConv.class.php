@@ -36,7 +36,6 @@ class CmdConv extends CmdBase {
      * @return bool|GenericCommand
      */
     static function exeCmd($genericCmd){
-        echo __METHOD__."\r\n";
         $cmd = new self($genericCmd);
         $opType = $genericCmd->getOp();
         switch($opType){
@@ -121,13 +120,14 @@ class CmdConv extends CmdBase {
             ))->find();
             if($resultConv){
                 $cid = $resultConv['_id'];
+                $m = $resultConv['m'];
             }
         }
         //如果没有，则创建对话
         if(empty($cid)) {
             /** @var $result \MongoId */
             $result = $model->add($data);
-            log_write($model->_sql(),__METHOD__);
+            //log_write($model->_sql(),__METHOD__);
             if(empty($result)){
                 log_write($model->getDbError(),'SQL_ERROR');
             }
@@ -137,35 +137,66 @@ class CmdConv extends CmdBase {
         $convMessage->setUdate(date(DATE_ISO8601,$data['updatedAt']->sec));
         $convMessage->setCdate(date(DATE_ISO8601,$data['createdAt']->sec));
         $this->pushClientQueue($genericCmd);
-        $this->opJoined($genericCmd);
-        $this->opMembers_joined($genericCmd);
+        $onlineM = self::getOnlineSession($m);
+        $this->emitJoined($genericCmd,$onlineM);
+        $this->emitMembers_joined($genericCmd,$onlineM);
     }
 
     /**
-     * 触发加入事件
+     * 触发被邀事件（只有被邀用户在线时才发送） 85
      * @param $genericCmd GenericCommand
      */
-    public function opJoined($genericCmd){
+    public function emitInvited($genericCmd,$m=array()){
         $resp = new GenericCommand();
         $resp->setCmd(self::CMD);
-        $resp->setOp(OpType::joined);
+        $resp->setOp(OpType::invited);
         $resp->setPeerId($genericCmd->getPeerId());
         $convMessage = new ConvCommand();
         $cid = $genericCmd->getConvMessage()->getCid();
         $convMessage->setCid($cid);
+        $convMessage->setInitBy($genericCmd->getPeerId());
         $resp->setConvMessage($convMessage);
+        //通知所有在对话中的人,如果在线的话
+        if(empty($m)) {
+            $m = $genericCmd->getConvMessage()->getM();
+        }
+        $m = self::getOnlineSession($m);
+        foreach($m as $to) {
+            $resp->setPeerId($to);
+            $this->pushClientQueue($resp);
+        }
+    }
+
+    /**
+     * 触发加入事件 32
+     * @param $genericCmd GenericCommand
+     */
+    public function emitJoined($genericCmd,$m=array()){
+        $resp = new GenericCommand();
+        $resp->setCmd(self::CMD);
+        $resp->setOp(OpType::joined);
+        $peerId = $genericCmd->getPeerId();
+        $convMessage = new ConvCommand();
+        $cid = $genericCmd->getConvMessage()->getCid();
+        $convMessage->setCid($cid);
+        $convMessage->setInitBy($peerId);
+        $resp->setConvMessage($convMessage);
+        //通知所有在对话中的人,如果在线的话
+        if(empty($m)) {
+            $m = $genericCmd->getConvMessage()->getM();
+            $m = self::getOnlineSession($m);
+        }
         //通知所有在对话中的人
-        $m = $genericCmd->getConvMessage()->getM();
         foreach($m as $to) {
             $resp->setPeerId($to);
             $this->pushClientQueue($resp);
         }
     }
     /**
-     * 触发加入事件
+     * 触发加入事件 33
      * @param $genericCmd GenericCommand
      */
-    public function opMembers_joined($genericCmd){
+    public function emitMembers_joined($genericCmd,$m=array()){
         $resp = new GenericCommand();
         $resp->setCmd(self::CMD);
         $resp->setOp(OpType::members_joined);
@@ -173,9 +204,61 @@ class CmdConv extends CmdBase {
         $convMessage = new ConvCommand();
         $convMessage->setCid($genericCmd->getConvMessage()->getCid());
         $convMessage->setInitBy($genericCmd->getPeerId());
+        $addM = $genericCmd->getConvMessage()->getM();
+        foreach ($addM as $v){
+            $convMessage->appendM($v);
+        }
         $resp->setConvMessage($convMessage);
         //通知会话中的所有人
-        $m = $genericCmd->getConvMessage()->getM();
+        //通知所有在对话中的人
+        foreach($m as $to) {
+            $resp->setPeerId($to);
+            $this->pushClientQueue($resp);
+        }
+    }
+
+    /**
+     * 触发被踢事件被踢用户在线时才发送）
+     * @param $genericCmd GenericCommand
+     */
+    public function emitKicked($genericCmd,$m=array()){
+        $resp = new GenericCommand();
+        $resp->setCmd(self::CMD);
+        $resp->setOp(OpType::kicked);
+        $resp->setPeerId($genericCmd->getPeerId());
+        $convMessage = new ConvCommand();
+        $cid = $genericCmd->getConvMessage()->getCid();
+        $convMessage->setCid($cid);
+        $convMessage->setInitBy($genericCmd->getPeerId());
+        $resp->setConvMessage($convMessage);
+        //通知所有在对话中的人,如果在线的话
+        if(empty($m)) {
+            $m = $genericCmd->getConvMessage()->getM();
+            $m = self::getOnlineSession($m);
+        }
+        foreach($m as $to) {
+            $resp->setPeerId($to);
+            $this->pushClientQueue($resp);
+        }
+    }
+    /**
+     * 触发用户离开事件只有被邀用户在线时才发送）
+     * @param $genericCmd GenericCommand
+     */
+    public function emitMembers_left($genericCmd,$m = array()){
+        $resp = new GenericCommand();
+        $resp->setCmd(self::CMD);
+        $resp->setOp(OpType::members_left);
+        $convMessage = new ConvCommand();
+        $cid = $genericCmd->getConvMessage()->getCid();
+        $convMessage->setCid($cid);
+        $convMessage->setInitBy($genericCmd->getPeerId());
+        $left_m = $genericCmd->getConvMessage()->getM();
+        foreach($left_m as $_m) {
+            $convMessage->appendM($_m);
+        }
+        $resp->setConvMessage($convMessage);
+        //通知所有其它人
         foreach($m as $to) {
             $resp->setPeerId($to);
             $this->pushClientQueue($resp);
@@ -237,7 +320,7 @@ class CmdConv extends CmdBase {
 
         $flag = $convCommand->getFlag();
         $resultList = $model->where($where)->select();
-        log_write($model->_sql(),__METHOD__);
+        //log_write($model->_sql(),__METHOD__);
         $data = array();
         foreach($resultList as $result){
             $cid = $result['_id'];
@@ -254,7 +337,7 @@ class CmdConv extends CmdBase {
                 $msgData = $msgModel->where(array(
                     'convId'=>$cid
                 ))->order('createdAt desc')->find();
-                log_write($msgModel->_sql(),__METHOD__);
+                //log_write($msgModel->_sql(),__METHOD__);
                 if($msgData) {
                     $result['msg'] = $msgData['data'];
                     $result['lm'] = array(
@@ -281,8 +364,6 @@ class CmdConv extends CmdBase {
      * @return bool|void
      */
     public function opUpdate($genericCmd){
-        echo __METHOD__."\r\n";
-        log_write(__METHOD__);
         $resp = new GenericCommand();
         $resp->setCmd(OpType::updated);
         $resp->setI($genericCmd->getI());
@@ -317,8 +398,8 @@ class CmdConv extends CmdBase {
         $result = $model->where(array(
             '_id' => $cid
         ))->save($data);
-        echo $model->_sql();
-        log_write($model->_sql(),__METHOD__);
+
+        //log_write($model->_sql(),__METHOD__);
         $convMessage->setCid($cid);
         $convMessage->setUdate(date(DATE_ISO8601,$data['updatedAt']->sec));
         $convMessage->setCdate(date(DATE_ISO8601,$data['createdAt']->sec));
@@ -337,7 +418,6 @@ class CmdConv extends CmdBase {
         //查找聊天室信息
         $model = Db::MongoModel('conversation');
         $result = $model->find($cid);
-        log_write(print_r($result,true));
         $count = count($result['m']);
         $convMessage->setCount($count);
         $resp = new GenericCommand();
@@ -358,22 +438,35 @@ class CmdConv extends CmdBase {
         $convMessage = $genericCmd->getConvMessage();
         $m = $convMessage->getM();
         $cid = $convMessage->getCid();
-        //查询数据库
-        $result = $this->_getConversation($cid);
-        $result_m = $result['m'];
-        $m = array_unique(array_merge($result_m,$m));
         $model = $this->_getConvModel();
+        //更新数据库
         $data = $model->create(array(
-            'm'=>$m
+            'm' => array('addToSet',array('$each'=>$m))
         ),MongoModel::MODEL_UPDATE);
+        //更新对话成员
         $result = $model->where(array('_id'=>$cid))->save($data);
         \Think\Log::write($model->_sql(),'SQL');
+        //返回
         $resp = new GenericCommand();
         $resp->setCmd($genericCmd->getCmd());
         $resp->setI($genericCmd->getI());
         $resp->setPeerId($genericCmd->getPeerId());
         $resp->setOp(OpType::added);//10
-        return $this->pushClientQueue($resp);
+        $this->pushClientQueue($resp);
+
+        //查询数据库
+        $result = $this->_getConversation($cid);
+        $new_m = self::getOnlineSession($result['m']);
+        //  发送事件 32
+        //1、invited 被邀请者(在线）
+        $m = self::getOnlineSession($m);
+        $this->emitJoined($genericCmd,$m);
+        // 2 发送事件 33 邀请者，被邀请者，其它人
+        $this->emitMembers_joined($genericCmd,$new_m);
+        //2、invited 85 被邀请者(好像SDK没有做判断,估计是被废弃了，这儿就不写了）
+        //$this->emitInvited($genericCmd,$m);
+        return true;
+
     }
 
     /**
@@ -386,42 +479,53 @@ class CmdConv extends CmdBase {
         $convMessage = $genericCmd->getConvMessage();
         $m = $convMessage->getM();
         $cid = $convMessage->getCid();
-        //查询数据库
-        $result = $this->_getConversation($cid);
-        $result_m = $result['m'];
-        $m = array_unique(array_diff($result_m,$m));
         $model = $this->_getConvModel();
         $data = $model->create(array(
-            'm'=>$m
+            'm' => array('pullAll',$m)
         ),MongoModel::MODEL_UPDATE);
         $result = $model->where(array('_id'=>$cid))->save($data);
+        \Think\Log::write($model->_sql(),'SQL');
+        //返回本次操作结果
         $resp = new GenericCommand();
         $resp->setCmd($genericCmd->getCmd());
         $resp->setI($genericCmd->getI());
         $resp->setPeerId($genericCmd->getPeerId());
-        $resp->setOp(OpType::removed);//10
-        return $this->pushClientQueue($resp);
+        $resp->setOp(OpType::removed);//11
+        $this->pushClientQueue($resp);
+        //查询数据库
+        $result = $this->_getConversation($cid);
+        $new_m = self::getOnlineSession($result['m']);
+        //  发送事件 40
+        //1、memberleft 邀请者，被邀请者，其它人
+        $this->emitMembers_left($genericCmd,$new_m);
+        //2、kicked 86 被邀请者 todo 判断是否在线
+        $this->emitKicked($genericCmd);
+
+        return true;
     }
 
     /**
-     * 状态更新
+     * 更新会话的上下线通知策略
      *  @param $client_id
      * @param $genericCmd GenericCommand
      */
     public function opStatus($genericCmd){
         $resp = $this->genericCmd;
         $resp->setOp(OpType::updated);
-        //发送其它的 //todo
-        $this->pushClientQueue($resp);
         //todo
-        $this->_cmdPresence($genericCmd);
+        // pub 是否公开自己的上下线状态
+        // sub 是否订阅该会话其他成员公开的上下线状态
+        //回复
+        $this->pushClientQueue($resp);
+        //todo 以后要移走，这儿只是让测试通过
+        $this->emitCmdPresence($genericCmd);
     }
     /**
-     * 状态更新
+     * 状态更新通知
      * @param $genericCmd GenericCommand
      */
-    //todo 上提提示 要移到另外地方，这儿先调 通接口
-    public function _cmdPresence($genericCmd){
+    //todo 状态更新通知 要移到另外地方，这儿先调 通接口
+    public function emitCmdPresence($genericCmd){
         $cid = $genericCmd->getConvMessage()->getCid();
         $status = $genericCmd->getConvMessage()->getStatusSub();
         $peerId = $genericCmd->getPeerId();
@@ -437,6 +541,8 @@ class CmdConv extends CmdBase {
         if(!$status){
             //unset($m[array_search($peerId,$m)]);
         }
+        //获取在线的
+        $m = self::getOnlineSession($m);
         foreach($m as $v){
             $msg->appendSessionPeerIds($v);
         }

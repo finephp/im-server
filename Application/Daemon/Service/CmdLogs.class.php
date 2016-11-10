@@ -41,7 +41,6 @@ class CmdLogs extends CmdBase {
      * @return GenericCommand|bool
      */
     public function logsCommand($genericCmd){
-        echo __METHOD__."\r\n";
         $recLogsMessage = $genericCmd->getLogsMessage();
         $cid = $recLogsMessage->getCid();
         //查询消息列表

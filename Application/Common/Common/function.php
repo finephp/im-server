@@ -484,7 +484,40 @@ function colorize($text, $status) {
             $out = "[44m"; //Blue background
             break;
         default:
-            $out = "[".$status."m";
+            $out = "[".$status."";
     }
     return chr(27) . "$out" . "$text" . chr(27) . "[0m";
+}
+
+function debug_factory($name,$status = '37m'){
+    /**
+     * echo -e “\033[30m 黑色字 \033[0m”
+    　　echo -e “\033[31m 红色字 \033[0m”
+    　　echo -e “\033[32m 绿色字 \033[0m”
+    　　echo -e “\033[33m 黄色字 \033[0m”
+    　　echo -e “\033[34m 蓝色字 \033[0m”
+    　　echo -e “\033[35m 紫色字 \033[0m”
+    　　echo -e “\033[36m 天蓝字 \033[0m”
+    　　echo -e “\033[37m 白色字 \033[0m”
+     */
+    $debug_env = getenv("DEBUG");
+    $show_debug = false;
+    if($debug_env){
+        if(strpos($debug_env,'*') !== false){
+            $debug_env = str_replace('*','.*',$debug_env);
+            $reg = '/^'.$debug_env.'$/';
+            $show_debug = !!preg_match($reg,$name);
+        }
+        elseif($debug_env === $name){
+            $show_debug = true;
+        }
+    }
+    if($status){
+        $name = colorize($name,$status);
+    }
+    return function($str1,$str2='')use($name,$show_debug){
+       if($show_debug) {
+           echo $name . ' ' . $str1 . ' ' . $str2 . "\r\n";
+       }
+    };
 }

@@ -17,6 +17,7 @@ class RealtimeService{
     static function handleMessage($data){
         $service = new self();
         $service->handleGenericCommand($data);
+        unset($service);
     }
 
     public function encodeResp($resp){
@@ -40,6 +41,7 @@ class RealtimeService{
      * @param $packed
      */
     public function handleGenericCommand($packed){
+        G(__METHOD__.'START');
         $genericCmd  = new GenericCommand();
         try {
             $genericCmd->parseFromString($packed);
@@ -50,7 +52,7 @@ class RealtimeService{
             return;
         }
         ob_start();
-        echo "in:";
+        echo __METHOD__." in:";
         $genericCmd->dump();
         $in_str = ob_get_clean();
         log_write($in_str);
@@ -89,6 +91,11 @@ class RealtimeService{
             default:
                 echo 'undefined Cmd:'.$cmd ."\r\n";
                 break;
+        }
+        G(__METHOD__.'END');
+        $runtime = G(__METHOD__.'START',__METHOD__.'END');
+        if($runtime>0.3){
+            echo colorize('time long:'.$runtime .' CMD:'.$cmd,'WARNING')." \r\n";
         }
     }
     /**

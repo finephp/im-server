@@ -2,6 +2,7 @@
 namespace Daemon\Service;
 class Db{
     public $db;
+    static $_models = array();
     /**
      * @param $name
      * @return MongoModel | bool
@@ -12,7 +13,13 @@ class Db{
                 $config = C('DB_CONFIG_MONGO');
             }
             $dbName = $config['DB_NAME'];
-            return new MongoModel($dbName.'.'.$name, '', $config);
+            //获取缓存
+            $_models = & self::$_models;
+            if(isset($_models[$dbName.'.'.$name])) {
+                return $_models[$dbName.'.'.$name];
+            }
+            $_models[$dbName.'.'.$name] = $model = new MongoModel($dbName.'.'.$name, '', $config);
+            return $model;
         }catch(\Exception $e){
             self::E(__METHOD__.":connect MongoDb error:".$e->getMessage());
             print_r(C('DB_CONFIG_MONGO'));

@@ -25,7 +25,6 @@ class CmdRead extends CmdBase {
      * @return \GenericCommand|bool
      */
     public function readCommand($genericCmd){
-        echo __METHOD__."\r\n";
         $peerId = $genericCmd->getPeerId();
         $readMessage = $genericCmd->getReadMessage();
         $convs = $readMessage->getConvs() or $convs = array();
