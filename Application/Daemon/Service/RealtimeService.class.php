@@ -27,6 +27,7 @@ class RealtimeService{
         if($this->noBinary) {
             $new_resp = base64_encode($new_resp);
         }
+        /*
         $connection = $_SESSION['connection'];
         ob_start();
         echo "out: connection id:".$connection->id.':';
@@ -34,6 +35,7 @@ class RealtimeService{
         $respstr = ob_get_clean();
         log_write($respstr);
         echo $respstr;
+        */
         return $new_resp;
     }
 
@@ -51,12 +53,14 @@ class RealtimeService{
             var_dump(base64_encode($packed));
             return;
         }
+        /*
         ob_start();
         echo __METHOD__." in:";
         $genericCmd->dump();
         $in_str = ob_get_clean();
         log_write($in_str);
         echo $in_str."\r\n";
+        */
         $appId = $genericCmd->getAppId();
         $cmd = $genericCmd->getCmd();
         switch($cmd){
@@ -94,8 +98,17 @@ class RealtimeService{
         }
         G(__METHOD__.'END');
         $runtime = G(__METHOD__.'START',__METHOD__.'END');
-        if($runtime>0.3){
-            echo colorize('time long:'.$runtime .' CMD:'.$cmd,'WARNING')." \r\n";
+        if($runtime>0.1){
+            echo colorize('CMD:'.$cmd.' op:'.$genericCmd->getOp().' runtime time long :'.$runtime ,'WARNING')." \r\n";
+        }
+        else{
+            echo colorize('CMD:'.$cmd.' op:'.$genericCmd->getOp().' runtime:'.$runtime,'SUCCESS')."\r\n";
+        }
+        if($runtime>=0.1){
+            log_write('CMD:'.$cmd.' op:'.$genericCmd->getOp().' runtime time long :'.$runtime,'LONG_TIME');
+        }
+        if($cmd == 2){
+            log_write('CMD:'.$cmd.' op:'.$genericCmd->getOp().' runtime:'.$runtime);
         }
     }
     /**

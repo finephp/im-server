@@ -80,7 +80,7 @@ class CmdLogs extends CmdBase {
             $limit = 100;
         }
         $where  = array(
-            'to' => $peerid,
+            //'to' => $peerid,
             'convId' => $cid
         );
         if($t){
@@ -104,6 +104,6 @@ class CmdLogs extends CmdBase {
     }
 
     protected function _getMessageLogsModel(){
-        return Db::MongoModel('messageLogs');
+        return Db::MongoModel('message');
     }
 }

@@ -2,6 +2,7 @@
 namespace Daemon\Service;
 use CommandType;
 use ErrorCommand;
+use GatewayWorker\Lib\Gateway;
 use GenericCommand;
 if(!IS_CLI){
     die('NOT CLI');
@@ -38,6 +39,9 @@ abstract class CmdBase{
     protected function _getConvModel(){
         return Db::MongoModel('conversation');
     }
+    protected function _getUserConvModel(){
+        return Db::MongoModel('userMessage');
+    }
     protected function encodeResp($resp){
         /**  todo debug
         ob_start();
@@ -58,7 +62,16 @@ abstract class CmdBase{
      * @return bool
      */
     protected function pushClientQueue($data){
-        echo (__METHOD__."\r\n");
+        //如果不进redis的话，直接调用gateway发送
+        if(defined('ENV_NOREDIS')){
+            //如果有i，发送到当前的
+            if($data->getI()){
+                Gateway::sendToCurrentClient($this->encodeResp($data));
+            }else{
+                Gateway::sendToUid($data->getPeerId(), $this->encodeResp($data));
+            }
+            return true;
+        }
         $data = $this->encodeResp($data);
         $redisService = RedisService::getInstance();
         $redisService->pushClientQueue($data);
@@ -109,5 +122,10 @@ abstract class CmdBase{
             $__debug_Closure = debug_factory('');
         }
         call_user_func($__debug_Closure,$str,$title);
+    }
+
+    static function E($msg){
+        echo (colorize($msg."\r\n",'FAILURE'));
+        //return false;
     }
 }

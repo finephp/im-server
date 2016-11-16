@@ -1,0 +1,263 @@
+<?php
+namespace Daemon\Service;
+use \CommandType;
+use GatewayWorker\Lib\Gateway;
+use \GenericCommand;
+use OpType;
+use SessionCommand;
+
+if(!IS_CLI){
+    die('NOT CLI');
+}
+include_once (dirname(APP_PATH).'/server/pb_proto_message.php');
+
+//for win
+//require_once (APP_PATH.'Common/Vendor/protocolbuf/message/pb_message.php');
+//require_once (dirname(APP_PATH).'/proto/pb_proto_message.php');
+//for end
+class RealtimeGateway {
+    /**
+     * @var $connection RealtimeConnection
+     */
+    public $connection;
+    public $client_id;
+    public $data;
+    public $noBinary;
+
+    /**
+     * @param $client_id
+     * @param $data
+     */
+    static function handleMessage($client_id,$data){
+        $connection = self::getConnection($client_id);
+        $noBinary = isset($connection->SecWebSocketProtocol) && $connection->SecWebSocketProtocol=='lc.protobase64.3';
+        //echo $connection->SecWebSocketProtocol;
+        if($noBinary){
+            $packed = base64_decode($data);
+        }
+        else{
+            //设置为 BINARY_TYPE_ARRAYBUFFER 格式
+            $packed = $data;
+            $connection->websocketType = \Workerman\Protocols\Websocket::BINARY_TYPE_ARRAYBUFFER;
+        }
+        $service = new self();
+        $service->noBinary = $noBinary;
+        $service->handleGenericCommand($connection,$packed);
+    }
+
+    /**
+     * @param $client_id string
+     */
+    static function handleClose($client_id){
+        $connection = self::getConnection($client_id);
+        RealtimeGatewayClients::unregister($connection);
+    }
+
+    /**
+     * @param $resp GenericCommand
+     * @return string
+     */
+    public function encodeResp($resp){
+        /* todo debug
+        ob_start();
+        $resp->dump();
+        $respstr = ob_get_clean();
+        log_write($respstr);
+        echo $respstr;
+        unset($respstr);
+        */
+        $new_resp = $resp->serializeToString();
+        //这个地方要注意 todo 可能在web版中会有问题
+        //$new_resp .= pack('H*','EA0600');
+        /*
+        if($this->noBinary) {
+            $new_resp = base64_encode($new_resp);
+        }
+        */
+        return $new_resp;
+    }
+
+    /**
+     * @param $connection RealtimeConnection
+     * @param $packed
+     */
+    public function handleGenericCommand($connection,$packed){
+        $genericCmd  = new GenericCommand();
+        try {
+            $genericCmd->parseFromString($packed);
+        } catch (\Exception $e) {
+            //die('Parse error: ' . $e->getMessage());
+            echo 'Parse error: ' . $e->getMessage();
+            var_dump(base64_encode($packed));
+            return;
+        }
+        /*//todo debug
+        echo "connection id[".$connection->id."]:in:";
+        ob_start();
+        $genericCmd->dump();
+        $in_str = ob_get_clean();
+        //log_write($in_str);
+        echo $in_str."\r\n";
+        */
+        $appId = $genericCmd->getAppId();
+        $cmd = $genericCmd->getCmd();
+        $this->connection = $connection;
+        switch($cmd){
+            // rcp 保持心跳？
+            case 14:
+                $this->send($genericCmd);
+                break;
+            //session 0 预处理
+            case CommandType::session:
+                $this->cmdSession($genericCmd);
+                break;
+            case CommandType::direct: //2
+                $this->pushServerQueue($genericCmd,RedisService::SERVER_QUEUE_DIRECT);
+                break;
+            // 收到响应
+            case CommandType::ack: //3
+                $this->pushServerQueue($genericCmd,RedisService::SERVER_QUEUE_ACK);
+                break;
+             //对话操作 1
+            case CommandType::conv: //1
+             //聊天消息
+            //已读
+            case CommandType::read: // 11
+            //记录
+            case CommandType::logs: // 6
+                //提交到redis中进行处理
+                $this->pushServerQueue($genericCmd);
+                break;
+            default:
+                echo "unknow cmd:".$cmd."\r\n";
+        }
+    }
+
+    /**
+     * @param $data
+     * @param null|RealtimeConnection $connection
+     */
+    public function send($data,$connection = null){
+        if(empty($connection)){
+            $connection = & $this->connection;
+        }
+        echo 'sendto id:'.$connection->peerId.'=>'.$connection->id."\r\n";
+        Gateway::sendToClient($connection->id,$this->encodeResp($data));
+    }
+
+    public function pushServerQueue($data,$queue = ''){
+        echo 'pushServerQueue:'."\r\n";
+        $data = $this->encodeResp($data);
+        //todo debug
+        if(defined('ENV_NOREDIS')) {
+            RealtimeService::handleMessage($data);
+            return;
+        }// end todo
+        $redisService = RedisService::getInstance();
+        if($queue){
+            $redisService->pushQueue($queue,$data);
+        }else {
+            $redisService->pushServerQueue($data);
+        }
+    }
+    /**
+     * @param $genericCmd \GenericCommand
+     */
+    public function cmdSession($genericCmd){
+        //todo 原来如果没有peerId,取 connection中的peerId
+        $peerId = $genericCmd->getPeerId()
+        //or (!empty($this->connection->peerId) && $peerId = $this->connection->peerId)
+        or $peerId = "guest_" . md5(time() . mt_rand(1, 10));
+        $genericCmd->setPeerId($peerId);
+        //如果是open的话,才进行register操作
+        if($genericCmd->getOp() == OpType::open) {
+            $this->register($genericCmd, $this->connection);
+        }
+        $this->pushServerQueue($genericCmd);
+    }
+
+    /**
+     * @param $connection RealtimeConnection
+     * @param $genericCmd GenericCommand
+     */
+    public function register($genericCmd,$connection){
+        $peerId = $genericCmd->getPeerId();
+        $sessionMessage = $genericCmd->getSessionMessage();
+        $tag = $sessionMessage->getTag();
+        RealtimeGatewayClients::register($peerId,$connection,$tag);
+        //处理 tag 冲突的connections
+        $conflict = RealtimeGatewayClients::getConflictConnection($peerId,$connection,$tag);
+        if($conflict){
+            echo colorize('CONFLICT:'.$peerId,'WARNING')."\r\n";
+            $resp = new \GenericCommand();
+            $resp->setCmd(CommandType::session);
+            $resp->setOp(OpType::closed);
+            $resp->setAppId($genericCmd->getAppId());
+            $resp->setPeerId($peerId);
+            $sessMsg = new SessionCommand();
+            $sessMsg->setCode(4111);// session token
+            $sessMsg->setReason('SESSION_CONFLICT');//session token ttl
+            $resp->setSessionMessage($sessMsg);
+            RealtimeGatewayClients::sendByClients($conflict,$this->encodeResp($resp));
+        }
+    }
+
+    /**
+     * @param $result string
+     * @return bool|void
+     */
+    static function handleClientQueue($result){
+        if(!$result){
+            return false;
+        }
+        $genericCmd  = new GenericCommand();
+        try {
+            $genericCmd->parseFromString($result);
+        } catch (\Exception $e) {
+            echo 'Parse error: ' . $e->getMessage();
+            var_dump(base64_encode($result));
+            return false;
+        }
+        $peerId = $genericCmd->getPeerId();
+        //发送到相应的client
+        $genericCmd->dump();
+        RealtimeGatewayClients::sendByUser($peerId,$result);
+        return true;
+    }
+
+    /**
+     * @param $client_id
+     * @return RealtimeConnection|null
+     */
+    static function getConnection($client_id){
+        //如果当前client_id = 全局的 client_id
+        if($client_id == $_SERVER['GATEWAY_CLIENT_ID']){
+            $session = $_SESSION;
+        }
+        else {
+            $session = Gateway::getSession($client_id) or $session = array();
+        }
+        if(!$session){
+            return null;
+        }
+        $connection = new RealtimeConnection();
+        $connection->session = $session;
+        $connection->id = $client_id;
+        $connection->peerId = $session['peerId'];
+        $connection->SecWebSocketProtocol = $session['SecWebSocketProtocol'];
+        return $connection;
+    }
+
+    //清理clients
+    static function clearClients(){
+        RealtimeGatewayClients::clearClients();
+    }
+}
+class RealtimeConnection{
+    public $session;
+    public $id;
+    public $peerId;
+    public $SecWebSocketProtocol;
+}
+
+

@@ -24,6 +24,7 @@ class RedisService{
     const SERVER_QUEUE = 'server_queue';
     const CLIENT_QUEUE = 'client_queue';
     const SERVER_QUEUE_DIRECT = 'server_queue_direct';//发消息队列
+    const SERVER_QUEUE_ACK = 'server_queue_ack';//回复队列
     const CLIENT_SESSION = 'client_session';
     const CLIENT_IDS = 'client_ids';
     static function getInstance(){
@@ -90,8 +91,14 @@ class RedisService{
     /**
      * 获取所有的在线用户
      */
-    public function getAllPeerId(){
+    public function getAllPeerId($real = false){
         $list = $this->redis->keys(self::CLIENT_SESSION.':*') or $List = array();
+        if($real){
+            $len = strlen(self::CLIENT_SESSION.':');
+            $list = array_map(function($v)use($len){
+                return substr($v,$len);
+            },$list);
+        }
         return $list;
     }
 
@@ -129,7 +136,6 @@ class RedisService{
     }
 
     public function pushClientQueue($data){
-        echo __METHOD__.':';
         try {
             //lpush模式
             $this->redis->lPush(self::CLIENT_QUEUE, $data); //改成sub模式

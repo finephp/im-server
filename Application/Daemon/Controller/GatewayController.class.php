@@ -29,6 +29,12 @@ class GatewayController extends Controller {
         unset($_SERVER['argv'][1]);
         global $argv;
         $argv = array_values($_SERVER['argv']);
+
+        //开启noredis模式
+        if(getenv('ENV_NOREDIS') == 'true'){
+            define('ENV_NOREDIS',true);
+            echo "ENV_NOREDIS:true"."\r\n";
+        }
         $this->gatewayWorker();
         $this->registerWorker();
         $this->businessWorker();

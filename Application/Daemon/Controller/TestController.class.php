@@ -87,21 +87,30 @@ class TestController extends Controller {
         var_dump($result);
     }
 
-    public function echo_a(){
-        $this->debug(debug_factory('LC:Test','43;31m'));
-        $this->debug("aaaaaaaaaaaaaaaaa");
-        $this->debug("bbbbbbbbbbbbbbbbbb");
+    public function insertUser(){
+        //更新记录
+        $userMsgModel = Db::MongoModel('userMessage');
+        $peerId = 'leeyeh';
+        $cid = '58079dbf9b1eaf34284a52b7';
+        $nowtime = new \MongoDate();
+        $data['convs'] = array($cid=>array(
+            'cid'=>$cid,
+            'unread'=>0,
+            'lm'=>$nowtime,
+        ));
+        $data['peerId'] = $peerId;
+        //查询是否存在obj_id
+        $info = $userMsgModel->where(array(
+            'peerId'=>$peerId
+        ))->find();
+        if($info){
+            $data['_id'] = $info['_id'];
+        }
+        print_r($data);
+        $result = $userMsgModel->where(array(
+            'peerId'=>$peerId
+        ))->add($data,array(),true);
+        var_dump($result);
     }
 
-    public function debug($str){
-        static $__debug_Closure;
-        if(is_object($str) && get_class($str) == 'Closure'){
-            $__debug_Closure = $str;
-            return;
-        }
-        if(empty($__debug_Closure)){
-            $__debug_Closure = debug_factory('');
-        }
-        call_user_func($__debug_Closure,$str);
-    }
 }

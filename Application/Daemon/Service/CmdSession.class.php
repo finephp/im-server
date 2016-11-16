@@ -86,35 +86,8 @@ class CmdSession extends CmdBase {
             $resp->setSessionMessage($sessMsg);
             $this->pushClientQueue($resp);
 
-            //返回未读消息
-            $logsModel = Db::MongoModel('messageLogs');
-            $logsResult = $logsModel->where(array(
-                'to' => $fromPearId,
-                'unread' => true,
-                //'ackAt'=>array('exists',true)
-            ))->limit(10)->order('createdAt desc')->select();
-            //log_write($logsModel->_sql(),__METHOD__);
-            if($logsResult){
-                $logsResult = array_groupbykey($logsResult,'convId');
-                //响应未读消息
-                $unreadMessage = new UnreadCommand();
-                foreach($logsResult as $convLogs){
-                    $logs = current($convLogs);//取第一条
-                    $count = count($convLogs);
-                    $unReadTuple = new \UnreadTuple();
-                    $unReadTuple->setCid($logs['convId']);
-                    $unReadTuple->setMid($logs['msgId']);
-                    $unReadTuple->setTimestamp(self::getTimestamp($logs['createdAt']));
-                    $unReadTuple->setUnread($count);
-                    $unreadMessage->appendConvs($unReadTuple);
-                }
-                $respUnread = new GenericCommand();
-                $respUnread->setPeerId($genericCmd->getPeerId());
-                $respUnread->setCmd(CommandType::unread);
-                $respUnread->setAppId($genericCmd->getAppId());
-                $respUnread->setUnreadMessage($unreadMessage);
-                $this->pushClientQueue($respUnread);
-            }
+            //响应未读消息
+            $this->emitUnreadCommand($genericCmd);
         }
         return false;
     }
@@ -147,5 +120,71 @@ class CmdSession extends CmdBase {
         $genericCmd->setSessionMessage($message);
         $this->pushClientQueue($genericCmd);
         return true;
+    }
+    //发送所有未读消息
+    /**
+     * @param $genericCmd GenericCommand
+     */
+    protected function emitUnreadCommand($genericCmd){
+        $debug = debug_factory('LC:SQL','33m');
+        $fromPearId = $genericCmd->getPeerId();
+        //查找该用户所在的所有会话
+        $userMsgModel = Db::MongoModel('userMessage');
+        $info = $userMsgModel->where(array(
+            'peerId'=>$fromPearId
+        ))->find();
+        $debug($userMsgModel->_sql());
+        if(!$info || !$info['conv']){
+            return;
+        }
+        $logsModel = Db::MongoModel('message');
+        $convs = $info['conv'];
+        $logsResult = array();
+        foreach($convs as $conv){
+            $where = array(
+                'convId'=>$conv['convId'],
+            );
+            if($conv['lm']){
+                $where['createdAt'] = array('gt',$conv['lm']);
+            }
+
+            $convLogs = $logsModel->where($where)->order('createdAt desc,_id desc')->limit(100)->select();
+            $debug($logsModel->_sql());
+            reset($convLogs);
+            if($convLogs){
+                $logs = current($convLogs);//取第一条
+                $_arr = array();
+                $_arr['unread'] = count($convLogs);
+                $_arr['convId'] = $logs['convId'];
+                $_arr['msgId'] = $logs['_id'];
+                $_arr['timestamp'] = self::getTimestamp($logs['createdAt']);
+                $logsResult[] = $_arr;
+            }
+        }
+        //todo 以后改成group 现在先用php排序 排序start
+        $row1 = $row2 = array();
+        foreach ( $logsResult as $key => $row ){
+            $row1[$key] = $row ['timestamp'];
+            $row2[$key] = $row ['msgId'];
+        }
+        array_multisort($row1, SORT_DESC, $row2, SORT_DESC, $logsResult);
+        //  排序 end
+
+        //响应未读消息
+        $unreadMessage = new UnreadCommand();
+        foreach($logsResult as $logs){
+            $unReadTuple = new \UnreadTuple();
+            $unReadTuple->setCid($logs['convId']);
+            $unReadTuple->setMid($logs['msgId']);
+            $unReadTuple->setTimestamp($logs['timestamp']);
+            $unReadTuple->setUnread($logs['unread']);
+            $unreadMessage->appendConvs($unReadTuple);
+        }
+        $respUnread = new GenericCommand();
+        $respUnread->setPeerId($fromPearId);
+        $respUnread->setCmd(CommandType::unread);
+        $respUnread->setAppId($genericCmd->getAppId());
+        $respUnread->setUnreadMessage($unreadMessage);
+        $this->pushClientQueue($respUnread);
     }
 }

@@ -23,10 +23,11 @@ class RedisController extends Controller {
         Worker::$pidFile = '/tmp/'.APP_NAME.'.ReadQueueWorker.workerman.pid';
         echo Worker::$pidFile."\r\n";
         $this->readQueueWorker(RedisService::SERVER_QUEUE_DIRECT);
+        $this->readQueueWorker(RedisService::SERVER_QUEUE_ACK);
         $this->readQueueWorker();
         Worker::runAll();
     }
-    //读取队列
+    //读取服务端队列
     public function readQueueWorker($queue=''){
         $ws_worker = new Worker();
         $ws_worker->name = APP_NAME.'.ReadQueueWorker:'.$queue;
@@ -36,21 +37,31 @@ class RedisController extends Controller {
         {
             $redisService = RedisService::getInstance();
             while(true){
-                if($queue){
-                    $result = $redisService->getQueue($queue);
+                $results = array();
+                for($i=0;$i<1000;$i++){
+                    if($queue){
+                        $result = $redisService->getQueue($queue);
+                    }
+                    else {
+                        $result = $redisService->getServerQueue();
+                    }
+                    if($result) {
+                        array_push($results, $result);
+                    }
+                    else{
+                        //跳出本循环
+                        break;
+                    }
                 }
-                else {
-                    $result = $redisService->getServerQueue();
-                }
-                if($result){
-                    echo " serverQueue:";
+                if($results){
+                    echo " serverQueue:"."\r\n";
                     //开始处理redis中的数据
                     try {
                         //计算时间
-                        G('serverQueue_start');
-                        RealtimeService::handleMessage($result);
-                        G('serverQueue_end');
-                        echo colorize('runtime:'.G('serverQueue_start','serverQueue_end'),'SUCCESS')."\r\n";
+                        foreach($results as $result) {
+                            RealtimeService::handleMessage($result);
+                        }
+                        unset($results);
                     }
                     catch (\Exception $e){
                         echo colorize('readQueueWorker:'.$e->getMessage(),'FAILURE');

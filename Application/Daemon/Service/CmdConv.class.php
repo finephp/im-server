@@ -83,7 +83,6 @@ class CmdConv extends CmdBase {
         $message->setResults($jsonObjectMessage);
         $genericCmd->setConvMessage($message);
         $genericCmd->setOp(OpType::results);
-        //$genericCmd->setOp(OpType::query_result);
         return $this->pushClientQueue($genericCmd);
     }
 
@@ -133,13 +132,15 @@ class CmdConv extends CmdBase {
             }
             $cid = $model->getLastInsID();
         }
+        //更新会话成员信息
+        $this->insertUserConv($cid,$m);
         $convMessage->setCid($cid);
         $convMessage->setUdate(date(DATE_ISO8601,$data['updatedAt']->sec));
         $convMessage->setCdate(date(DATE_ISO8601,$data['createdAt']->sec));
         $this->pushClientQueue($genericCmd);
         $onlineM = self::getOnlineSession($m);
-        $this->emitJoined($genericCmd,$onlineM);
-        $this->emitMembers_joined($genericCmd,$onlineM);
+        //$this->emitJoined($genericCmd,$onlineM);
+        //$this->emitMembers_joined($genericCmd,$onlineM);
     }
 
     /**
@@ -445,7 +446,8 @@ class CmdConv extends CmdBase {
         ),MongoModel::MODEL_UPDATE);
         //更新对话成员
         $result = $model->where(array('_id'=>$cid))->save($data);
-        \Think\Log::write($model->_sql(),'SQL');
+        //\Think\Log::write($model->_sql(),'SQL');
+        $this->insertUserConv($cid,$m);
         //返回
         $resp = new GenericCommand();
         $resp->setCmd($genericCmd->getCmd());
@@ -460,9 +462,9 @@ class CmdConv extends CmdBase {
         //  发送事件 32
         //1、invited 被邀请者(在线）
         $m = self::getOnlineSession($m);
-        $this->emitJoined($genericCmd,$m);
+        //$this->emitJoined($genericCmd,$m);//todo debug
         // 2 发送事件 33 邀请者，被邀请者，其它人
-        $this->emitMembers_joined($genericCmd,$new_m);
+        //$this->emitMembers_joined($genericCmd,$new_m);//todo debug
         //2、invited 85 被邀请者(好像SDK没有做判断,估计是被废弃了，这儿就不写了）
         //$this->emitInvited($genericCmd,$m);
         return true;
@@ -485,6 +487,7 @@ class CmdConv extends CmdBase {
         ),MongoModel::MODEL_UPDATE);
         $result = $model->where(array('_id'=>$cid))->save($data);
         \Think\Log::write($model->_sql(),'SQL');
+        $this->removeUserConv($cid,$m);
         //返回本次操作结果
         $resp = new GenericCommand();
         $resp->setCmd($genericCmd->getCmd());
@@ -599,6 +602,59 @@ class CmdConv extends CmdBase {
         $this->pushClientQueue($resp);
     }
 
+    protected function insertUserConv($cid,$m){
+        $userMsgModel = $this->_getUserConvModel();
+        $list = $userMsgModel->where(array(
+            'peerId'=>array('in',$m)
+        ))->select() or $list = array();
+        $list = array_column($list,null,'peerId');
+        //查询是否存在obj_id
+        foreach($m as $peerId) {
+            $info = empty($list[$peerId]) ? array() : $list[$peerId];
+            if (isset($info['conv']) && isset($info['conv'][$cid])) {
+                continue;
+            }
+            $data = array();
+            $data_conv = array();
+            $data['peerId'] = $peerId;
+            if($info){
+                $data['_id'] = $info['_id'];
+                $data_conv = $info['conv'];
+            }
+            $data_conv[$cid] = array(
+                'convId' => $cid,
+                'unread' => 0,
+            );
+            $data['conv'] = $data_conv;
+            //插入记录
+            try {
+                $userMsgModel->add($data, array(), true);
+            }catch (\Exception $e){
+                print_r($data);
+                self::E(__METHOD__.':'.$e->getMessage());
+            }
+        }
+    }
 
-
+    protected function removeUserConv($cid,$m){
+        $userMsgModel = $this->_getUserConvModel();
+        $list = $userMsgModel->where(array(
+            'peerId'=>array('in',$m)
+        ))->select();
+        //查询是否存在obj_id
+        if(!$list){
+            return;
+        }
+        //批量更新
+        foreach($list as $info) {
+            $data = array();
+            $data_conv = $info['conv'];
+            unset($data_conv[$cid]);
+            $data['conv'] = $data_conv;
+            //更新记录
+            $userMsgModel->where(array(
+                '_id' => $info['_id']
+            ))->save($data);
+        }
+    }
 }
