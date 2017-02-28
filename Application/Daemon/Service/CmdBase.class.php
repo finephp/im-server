@@ -31,17 +31,26 @@ abstract class CmdBase{
         return $resp;
     }
 
+    /**
+     * @param $cid string
+     * @return mixed
+     */
     protected function _getConversation($cid){
         $convModel = $this->_getConvModel();
         return $convModel->find($cid);
     }
 
     protected function _getConvModel(){
-        return Db::MongoModel('conversation');
+        return Db::MongoModel('Rtm_Conversation');
     }
     protected function _getUserConvModel(){
-        return Db::MongoModel('userMessage');
+        return Db::MongoModel('Rtm_UserConversations');
     }
+
+    /**
+     * @param $resp
+     * @return string
+     */
     protected function encodeResp($resp){
         /**  todo debug
         ob_start();
@@ -58,7 +67,7 @@ abstract class CmdBase{
     }
 
     /**
-     * @param $data GenericCommand
+     * @param $data GenericCommand|string
      * @return bool
      */
     protected function pushClientQueue($data){
@@ -72,10 +81,32 @@ abstract class CmdBase{
             }
             return true;
         }
-        $data = $this->encodeResp($data);
+        $data = is_string($data) ? $data:$this->encodeResp($data);
         $redisService = RedisService::getInstance();
         $redisService->pushClientQueue($data);
         return true;
+    }
+
+    /**
+     * @param $data GenericCommand
+     * @param $cid string
+     * @param $exclude_peerid array
+     * @return bool
+     */
+    protected function pushGroupQueue($data,$cid,$exclude_peerid = null){
+        $data = $this->encodeResp($data);
+        if($exclude_peerid) {
+            $exclude_client_id = Gateway::getClientIdByUid($exclude_peerid);
+        }
+        else{
+            $exclude_client_id = null;
+        }
+        Gateway::sendToGroup($cid,$data,$exclude_client_id);
+        return true;
+    }
+
+    protected function joinGroup(){
+
     }
 
     /**
@@ -90,7 +121,7 @@ abstract class CmdBase{
      * @param $date \MongoDate
      * @return int 13
      */
-    protected static function getTimestamp($date){
+    static function getTimestamp($date){
         return floor($date->sec*1000+($date->usec/1000));
     }
 

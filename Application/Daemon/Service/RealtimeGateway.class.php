@@ -3,7 +3,7 @@ namespace Daemon\Service;
 use \CommandType;
 use GatewayWorker\Lib\Gateway;
 use \GenericCommand;
-use OpType;
+use \OpType;
 use SessionCommand;
 
 if(!IS_CLI){
@@ -112,7 +112,8 @@ class RealtimeGateway {
                 $this->cmdSession($genericCmd);
                 break;
             case CommandType::direct: //2
-                $this->pushServerQueue($genericCmd,RedisService::SERVER_QUEUE_DIRECT);
+                //$this->pushServerQueue($genericCmd,RedisService::SERVER_QUEUE_DIRECT);
+                $this->handleCmd($genericCmd);
                 break;
             // 收到响应
             case CommandType::ack: //3
@@ -120,6 +121,8 @@ class RealtimeGateway {
                 break;
              //对话操作 1
             case CommandType::conv: //1
+                $this->cmdConv($genericCmd);
+                break;
              //聊天消息
             //已读
             case CommandType::read: // 11
@@ -160,6 +163,14 @@ class RealtimeGateway {
             $redisService->pushServerQueue($data);
         }
     }
+
+    /**
+     * @param $data GenericCommand
+     */
+    public function handleCmd($data){
+        $data = $this->encodeResp($data);
+        RealtimeService::handleMessage($data);
+    }
     /**
      * @param $genericCmd \GenericCommand
      */
@@ -173,7 +184,14 @@ class RealtimeGateway {
         if($genericCmd->getOp() == OpType::open) {
             $this->register($genericCmd, $this->connection);
         }
+        //$this->handleCmd($genericCmd);
         $this->pushServerQueue($genericCmd);
+    }
+    /**
+     * @param $genericCmd \GenericCommand
+     */
+    public function cmdConv($genericCmd){
+        $this->handleCmd($genericCmd);
     }
 
     /**
@@ -226,6 +244,92 @@ class RealtimeGateway {
     }
 
     /**
+     * 处理广播消息
+     * @param $msg String
+     */
+    static function handleBroadMessage($msg){
+        if(!$msg){
+            return false;
+        }
+        $genericCmd  = new GenericCommand();
+        try {
+            $genericCmd->parseFromString($msg);
+        } catch (\Exception $e) {
+            echo 'Parse error: ' . $e->getMessage();
+            var_dump(base64_encode($msg));
+            return false;
+        }
+        //发送到相应的client
+        $genericCmd->dump();
+        RealtimeGatewayClients::sendBroadcast($msg);
+        return true;
+    }
+
+    /**
+     * 处理组消息
+     * @param $msg String
+     *
+     */
+    static function handleGroupMessage($msg){
+        if(!$msg){
+            return false;
+        }
+        $genericCmd  = new GenericCommand();
+        try {
+            $genericCmd->parseFromString($msg);
+        } catch (\Exception $e) {
+            echo 'Parse error: ' . $e->getMessage();
+            var_dump(base64_encode($msg));
+            return false;
+        }
+        //发送到相应的client
+        $group_id = $genericCmd->getPeerId();//这儿把peerId转换成组id
+        RealtimeGatewayClients::sendGroup($group_id,$msg);
+    }
+    /**
+     * 处理命令
+     * @param $msg String
+     *
+     */
+    static function handleCmdMessage($message){
+        $message = json_decode($message,true);
+        $data = $message['data'];
+        $cmd = $message['cmd'];
+        switch($cmd){
+            case 'transient_group/onlines':
+                $gid = $data['gid'];
+                $result = Gateway::getClientCountByGroup($gid);
+                $result = json_encode(array(
+                    'result' => $result
+                ));
+                break;
+            //查询在线人数
+            case 'online':
+                $peers = $data['peers'];
+                $result = array_filter($peers,function($v){
+                    return Gateway::isUidOnline($v);
+                });
+                $result = json_encode(array(
+                    'result' => $result
+                ));
+                break;
+            //踢人
+            case 'online/kick':
+                $uid = $data['client_id'];
+                $reason = $data['reason'];
+                $clients = Gateway::getClientIdByUid($uid);
+                foreach($clients as $client_id) {
+                    Gateway::closeClient($client_id);
+                }
+                $result = '{}';
+                break;
+            default:
+                $result = '';
+        }
+        return $result;
+    }
+
+    /**
      * @param $client_id
      * @return RealtimeConnection|null
      */
@@ -235,7 +339,11 @@ class RealtimeGateway {
             $session = $_SESSION;
         }
         else {
-            $session = Gateway::getSession($client_id) or $session = array();
+            try {
+                $session = Gateway::getSession($client_id) or $session = array();
+            }catch (\Exception $e){
+                $session = array();
+            }
         }
         if(!$session){
             return null;

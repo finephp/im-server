@@ -32,20 +32,14 @@ class CmdAck extends CmdBase {
         $rcpMsg->setCid($cid);
         $rcpMsg->setT(time()*1000);
         $resp->setRcpMessage($rcpMsg);
-        $msgModel = $this->_getMessageLogsModel();
+        //todo next 查找该对话的需要回执的消息，并通知发消息的那个人，说消息已经被收到啦
+        /*
         $where = array(
             'convId'=>$cid,
-            'to' => $genericCmd->getPeerId(),
             'createdAt' => array('egt',self::getMongoDate($ackMessage->getFromts()))
         );
-        //批量更新对话消息为已读
-        $result = $msgModel->where($where)->save($msgModel->create(array(
-            'unread'=>false,
-        ),MongoModel::MODEL_UPDATE));
-        //log_write($msgModel->_sql(),'update messageLogs');
-        //log_write(print_r($result,true));
-        //查找该对话的需要回执的消息，并通知发消息的那个人，说消息已经被收到啦
         $where['receipt'] = true;
+        $msgModel= $this->_getMessageModel();
         $msgDataArr = $msgModel->where($where)->select() or $msgData = array();
         //发消息
         //只查在线之人
@@ -57,15 +51,16 @@ class CmdAck extends CmdBase {
             $resp->setPeerId($msgData['from']);
             $this->pushClientQueue($resp);
         }
+        */
         return true;
     }
 
     protected function _getMessageModel()
     {
-        return Db::MongoModel('message');
+        return Db::MongoModel('Rtm_Message');
     }
 
     protected function _getMessageLogsModel(){
-        return Db::MongoModel('messageLogs');
+        return Db::MongoModel('Rtm_MessageLogs');
     }
 }

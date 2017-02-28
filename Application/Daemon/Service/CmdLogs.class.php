@@ -104,6 +104,6 @@ class CmdLogs extends CmdBase {
     }
 
     protected function _getMessageLogsModel(){
-        return Db::MongoModel('message');
+        return Db::MongoModel('Rtm_Message');
     }
 }

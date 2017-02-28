@@ -9,7 +9,7 @@ if(!empty($_SERVER['HTTP_HOST']) && strpos($_SERVER['HTTP_HOST'],'localhost') !=
 }
 // 检测PHP环境
 if(version_compare(PHP_VERSION,'5.3.0','<'))  die('require PHP > 5.3.0 !');
-define('APP_NAME', 'QiankunQuotephpApi');
+define('APP_NAME', 'QiankunRealtimeServer');
 define('RUNTIME_PATH', '/tmp/runtime/devel/'.APP_NAME.'/');
 //设置session 规则
 define('COOKIE_DOMAIN','qiankun.com');

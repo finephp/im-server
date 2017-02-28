@@ -36,6 +36,28 @@ class RedisController extends Controller {
         $ws_worker->onWorkerStart = function($task)use($queue)
         {
             $redisService = RedisService::getInstance();
+            $i=0;
+            while(true){
+                if($queue){
+                    $result = $redisService->getQueue($queue);
+                }
+                else {
+                    $result = $redisService->getServerQueue();
+                }
+                if($result){
+                    echo " serverQueue:".($i++)."\r\n";
+                    //开始处理redis中的数据
+                    try {
+                        RealtimeService::handleMessage($result);
+                    }
+                    catch (\Exception $e){
+                        echo colorize('readQueueWorker:'.$e->getMessage(),'FAILURE');
+                        sleep(1);
+                    }
+                }
+            }
+
+            /*
             while(true){
                 $results = array();
                 for($i=0;$i<1000;$i++){
@@ -69,6 +91,7 @@ class RedisController extends Controller {
                     }
                 }
             }
+            */
         };
         if(!defined('WORKER_RUN_ALL')){
             Worker::runAll();

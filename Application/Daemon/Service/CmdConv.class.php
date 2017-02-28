@@ -1,6 +1,7 @@
 <?php
 namespace Daemon\Service;
 use CommandType;
+use GatewayWorker\Lib\Gateway;
 use JsonObjectMessage;
 use OpType;
 use ConvCommand;
@@ -93,7 +94,7 @@ class CmdConv extends CmdBase {
     public function opStart($genericCmd){
         $genericCmd->setOp(OpType::started);
         $convMessage = $genericCmd->getConvMessage();
-        $model = Db::MongoModel('conversation');
+        $model = self::_getConvModel();
         $m = $convMessage->getM();
         $creater = $genericCmd->getPeerId();
         $unique = $convMessage->getUnique();
@@ -111,9 +112,10 @@ class CmdConv extends CmdBase {
         $data = $model->create($data);
         //查询是否有维一的聊天室名称
         $unique = $convMessage->getUnique();
-        if($unique){
+        if(!$tr && $unique){
             $resultConv = $model->where(array(
                 'unique'=>true,
+                'tr'=>false,//非暂态聊天室
                 'name'=>$data['name'],
                 'c'=>$creater,
             ))->find();
@@ -132,15 +134,22 @@ class CmdConv extends CmdBase {
             }
             $cid = $model->getLastInsID();
         }
-        //更新会话成员信息
-        $this->insertUserConv($cid,$m);
+        //如果是暂态会话
+        if($tr){
+           print_r($_SERVER);
+
+        }
+        else {
+            //更新会话成员信息
+            $this->insertUserConv($cid, $m);
+        }
         $convMessage->setCid($cid);
         $convMessage->setUdate(date(DATE_ISO8601,$data['updatedAt']->sec));
         $convMessage->setCdate(date(DATE_ISO8601,$data['createdAt']->sec));
         $this->pushClientQueue($genericCmd);
         $onlineM = self::getOnlineSession($m);
-        //$this->emitJoined($genericCmd,$onlineM);
-        //$this->emitMembers_joined($genericCmd,$onlineM);
+        $this->emitJoined($genericCmd,$onlineM);
+        $this->emitMembers_joined($genericCmd,$onlineM);
     }
 
     /**
@@ -281,7 +290,7 @@ class CmdConv extends CmdBase {
         }
         $where = $convCommand->getWhere()->getData();
         $whereData = json_decode($where,true);
-        $model = Db::MongoModel('conversation');
+        $model = self::_getConvModel();
         $where = array();
         if(!empty($whereData['objectId'])){
             $where['_id'] = $whereData['objectId'];
@@ -320,6 +329,7 @@ class CmdConv extends CmdBase {
         //压缩
 
         $flag = $convCommand->getFlag();
+        $flag = 1;//todo debug
         $resultList = $model->where($where)->select();
         //log_write($model->_sql(),__METHOD__);
         $data = array();
@@ -331,10 +341,10 @@ class CmdConv extends CmdBase {
                 unset($result['m']);
             }
             //如果 withLastMessagesRefreshed 更新最后一条消息？
-            //todo debug
+            //todo last
             if($flag === 2){
                 //查询最后一条消息
-                $msgModel = Db::MongoModel('message');
+                $msgModel = Db::MongoModel('Rtm_Message');
                 $msgData = $msgModel->where(array(
                     'convId'=>$cid
                 ))->order('createdAt desc')->find();
@@ -371,7 +381,7 @@ class CmdConv extends CmdBase {
         $resp->setPeerId($genericCmd->getPeerId());
         $convMessage = $genericCmd->getConvMessage();
         $cid = $convMessage->getCid();
-        $model = Db::MongoModel('conversation');
+        $model = self::_getConvModel();
         //todo 校验cid是否有效
         $m = $convMessage->getM();
         if(!$convMessage->getAttr()){
@@ -417,7 +427,7 @@ class CmdConv extends CmdBase {
         $convMessage = $genericCmd->getConvMessage();
         $cid = $convMessage->getCid();
         //查找聊天室信息
-        $model = Db::MongoModel('conversation');
+        $model = self::_getConvModel();
         $result = $model->find($cid);
         $count = count($result['m']);
         $convMessage->setCount($count);
@@ -440,14 +450,31 @@ class CmdConv extends CmdBase {
         $m = $convMessage->getM();
         $cid = $convMessage->getCid();
         $model = $this->_getConvModel();
-        //更新数据库
-        $data = $model->create(array(
-            'm' => array('addToSet',array('$each'=>$m))
-        ),MongoModel::MODEL_UPDATE);
-        //更新对话成员
-        $result = $model->where(array('_id'=>$cid))->save($data);
-        //\Think\Log::write($model->_sql(),'SQL');
-        $this->insertUserConv($cid,$m);
+        //获取聊天室信息
+        $convInfo = $this->_getConversation($cid);
+        print_r(__METHOD__);
+        print_r($convInfo);
+        //判断聊天室是否暂态聊天室
+        //如果是暂态聊天室，把用户加到 gateway的聊天组
+        if(!empty($convInfo['tr'])){
+            if(!empty($_SERVER['GATEWAY_CLIENT_ID'])) {
+                Gateway::joinGroup($_SERVER['GATEWAY_CLIENT_ID'],$cid);
+                $tmp = new GenericCommand();
+                $tmp->setCmd(14);
+                $tmp->setOp(OpType::added);
+                $tmp->setPeerId($genericCmd->getPeerId());
+                $this->pushGroupQueue($tmp,$cid);
+            }
+        }
+        else {
+            //更新数据库中的对话成员
+            $data = $model->create(array(
+                'm' => array('addToSet', array('$each' => $m))
+            ), MongoModel::MODEL_UPDATE);
+            //更新对话成员
+            $result = $model->where(array('_id' => $cid))->save($data);
+            $this->insertUserConv($cid,$m);
+        }
         //返回
         $resp = new GenericCommand();
         $resp->setCmd($genericCmd->getCmd());
@@ -455,8 +482,9 @@ class CmdConv extends CmdBase {
         $resp->setPeerId($genericCmd->getPeerId());
         $resp->setOp(OpType::added);//10
         $this->pushClientQueue($resp);
+        return;//[todo debug]
 
-        //查询数据库
+        //查询数据库,并对其它客户端发送事件，这个考虑移到redis中处理
         $result = $this->_getConversation($cid);
         $new_m = self::getOnlineSession($result['m']);
         //  发送事件 32
@@ -611,7 +639,8 @@ class CmdConv extends CmdBase {
         //查询是否存在obj_id
         foreach($m as $peerId) {
             $info = empty($list[$peerId]) ? array() : $list[$peerId];
-            if (isset($info['conv']) && isset($info['conv'][$cid])) {
+            $info['convs'] = array_column($info['convs'],null,'convId');
+            if (isset($info['convs']) && isset($info['convs'][$cid])) {
                 continue;
             }
             $data = array();
@@ -625,7 +654,7 @@ class CmdConv extends CmdBase {
                 'convId' => $cid,
                 'unread' => 0,
             );
-            $data['conv'] = $data_conv;
+            $data['convs'] = $data_conv;
             //插入记录
             try {
                 $userMsgModel->add($data, array(), true);

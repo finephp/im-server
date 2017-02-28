@@ -28,6 +28,11 @@ class RealtimeGatewayClients{
         echo "{$user} {$tag} => {$id}"." open \r\n";
     }
 
+    //加入到 group中
+    static function joinGroup($group_id,$client_id=null){
+        Gateway::joinGroup($client_id,$group_id);
+    }
+
     /**
      * @param $connection RealtimeConnection
      */
@@ -59,13 +64,21 @@ class RealtimeGatewayClients{
             $user = [$user];
         }
         $count = 0;
-
         foreach($user as $peerId){
             $connections = self::getClientId($peerId);
             self::sendByClients($connections,$msg);
             $count++;
         }
         return $count;
+    }
+    //广播给所有人
+    static function sendBroadcast($msg){
+        Gateway::sendToAll($msg);
+    }
+
+    //广播给组
+    static function sendGroup($groupId,$msg){
+        Gateway::sendToGroup($groupId,$msg);
     }
 
 

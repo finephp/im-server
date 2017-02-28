@@ -2,13 +2,22 @@
 namespace Daemon\Controller;
 use Daemon\Service\Db;
 use Daemon\Service\MongoModel;
+use Daemon\Service\RedisService;
 use Think\Controller;
 require_once WORKERMAN_PATH;
 //include_once (dirname(APP_PATH).'/server/pb_proto_message.php');
-if(!IS_CLI){
-    die('NOT CLI');
-}
 class TestController extends Controller {
+    /**
+     * 校验环境
+     */
+    public function checkEnv(){
+        $redisService = RedisService::getInstance();
+        print_r($redisService);
+        $model = Db::MongoModel('conversation');
+        $result = $model->find();
+        print_r($result);
+        exit;
+    }
     public function index(){
         $model = Db::MongoModel('conversation');
         $whereData = json_decode('{"_id":{"$id":"58079dbf9b1eaf34284a52b7"},"createdAt":{"$lt":{"__type":"Date","iso":"2016-10-24T07:29:29.892Z"}}}',true);
@@ -89,7 +98,7 @@ class TestController extends Controller {
 
     public function insertUser(){
         //更新记录
-        $userMsgModel = Db::MongoModel('userMessage');
+        $userMsgModel = Db::MongoModel('Rtm_UserConversations');
         $peerId = 'leeyeh';
         $cid = '58079dbf9b1eaf34284a52b7';
         $nowtime = new \MongoDate();
@@ -112,5 +121,10 @@ class TestController extends Controller {
         ))->add($data,array(),true);
         var_dump($result);
     }
+
+    public function test2(){
+        print_r($_GET);
+    }
+
 
 }

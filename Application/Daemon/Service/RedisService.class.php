@@ -31,6 +31,10 @@ class RedisService{
         if(empty(self::$_instance)) {
             $self = new self();
             $result = $self->connect();
+            if(!$result){
+                sleep(1);
+                exit;
+            }
             self::$_instance = $self;
         }
         return self::$_instance;
@@ -38,6 +42,7 @@ class RedisService{
     public function connect(){
         $this->redis = new \Redis();
         $result = $this->redis->connect(C('REDIS_CONFIG.HOST'),C('REDIS_CONFIG.PORT'));
+        var_dump(__METHOD__);
         if($result){
             return $this->redis;
         }

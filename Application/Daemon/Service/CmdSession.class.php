@@ -85,7 +85,6 @@ class CmdSession extends CmdBase {
             $sessMsg->setStTtl(17280);//session token ttl
             $resp->setSessionMessage($sessMsg);
             $this->pushClientQueue($resp);
-
             //响应未读消息
             $this->emitUnreadCommand($genericCmd);
         }
@@ -129,16 +128,16 @@ class CmdSession extends CmdBase {
         $debug = debug_factory('LC:SQL','33m');
         $fromPearId = $genericCmd->getPeerId();
         //查找该用户所在的所有会话
-        $userMsgModel = Db::MongoModel('userMessage');
+        $userMsgModel = self::_getUserConvModel();
         $info = $userMsgModel->where(array(
             'peerId'=>$fromPearId
         ))->find();
         $debug($userMsgModel->_sql());
-        if(!$info || !$info['conv']){
+        if(!$info || !$info['convs']){
             return;
         }
-        $logsModel = Db::MongoModel('message');
-        $convs = $info['conv'];
+        $logsModel = Db::MongoModel('Rtm_Message');
+        $convs = $info['convs'];
         $logsResult = array();
         foreach($convs as $conv){
             $where = array(
@@ -147,7 +146,6 @@ class CmdSession extends CmdBase {
             if($conv['lm']){
                 $where['createdAt'] = array('gt',$conv['lm']);
             }
-
             $convLogs = $logsModel->where($where)->order('createdAt desc,_id desc')->limit(100)->select();
             $debug($logsModel->_sql());
             reset($convLogs);

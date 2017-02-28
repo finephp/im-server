@@ -34,7 +34,7 @@ class CmdRead extends CmdBase {
         foreach($convs as $v){
             $convList[$v->getCid()] = $v->getCid();
         }
-        $userMsgModel = Db::MongoModel('userMessage');
+        $userMsgModel = self::_getUserConvModel();
         $where = array(
             'peerId'=>$peerId
         );
@@ -47,11 +47,12 @@ class CmdRead extends CmdBase {
         $info = $userMsgModel->where($where)->find();
         if($info){
             $data['_id'] = $info['_id'];
-            $data_conv = $info['conv'];
+            $data_conv = !empty($info['convs'])?$info['convs']:[];
         }
         else {
             $data_conv = array();
         }
+        $data_conv = array_column($data_conv,null,'convId');//转换成key+value
         //标记为已读消息
         $unreadMessage = new UnreadCommand();
         foreach ($convs as $conv){
@@ -68,7 +69,8 @@ class CmdRead extends CmdBase {
             $unReadTuple->setUnread(0);
             $unreadMessage->appendConvs($unReadTuple);
         }
-        $data['conv'] = $data_conv;
+        $data_conv = array_values($data_conv);//转换成数组
+        $data['convs'] = $data_conv;
         //更新记录
         $userMsgModel->where($where)->add($data,array(),true);
         $debug_sql(__METHOD__,$userMsgModel->_sql());
@@ -98,7 +100,7 @@ class CmdRead extends CmdBase {
         if($convList){
             $where['convId'] = array('in',array_values($convList));
         }
-        $logsModel = Db::MongoModel('messageLogs');
+        $logsModel = $this->_getMessageLogsModel();
         //标记为已读消息
         $unreadMessage = new UnreadCommand();
         foreach ($convs as $conv){
@@ -131,10 +133,10 @@ class CmdRead extends CmdBase {
 
     protected function _getMessageModel()
     {
-        return Db::MongoModel('message');
+        return Db::MongoModel('Rtm_Message');
     }
 
     protected function _getMessageLogsModel(){
-        return Db::MongoModel('messageLogs');
+        return Db::MongoModel('Rtm_MessageLogs');
     }
 }

@@ -1,0 +1,8 @@
+<IfModule mod_rewrite.c>
+RewriteEngine on
+RewriteBase /qiankun/realtime-server
+RewriteCond $1 !^(index.php|Public|Uploads|Application)
+RewriteCond %{REQUEST_FILENAME} !-f  
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^(.*?)(\.html)?$ index.php/$1 [QSA,PT,L]
+</IfModule>

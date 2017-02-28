@@ -11,15 +11,35 @@ use Workerman\Worker;
 use GatewayWorker\Gateway;
 use Workerman\Autoloader;
 require_once WORKERMAN_PATH;
+include_once (dirname(APP_PATH).'/server/pb_proto_message.php');
 if(!IS_CLI){
     die('NOT CLI');
 }
 //gater way
 class GatewayController extends Controller {
     public function index(){
+        $this->show(__METHOD__);
         echo 'run worker';
         echo var_dump(LOG_PATH);
         echo var_dump(C('LOG_PATH'));
+    }
+    public function testWorker(){
+        // 标记是全局启动
+        define('GLOBAL_START', 1);
+        ob_end_flush();
+        //重置avgv
+        unset($_SERVER['argv'][1]);
+        global $argv;
+        $argv = array_values($_SERVER['argv']);
+
+        // 运行所有服务
+        Worker::$pidFile = '/tmp/testWorker.gateway.pid';
+        $worker = new Worker();
+        $worker->name = 'testWorker';
+        $worker->onWorkerStart = function() {
+            echo __METHOD__.'worker start';
+        };
+        Worker::runAll();
     }
     public function worker(){
         // 标记是全局启动
@@ -84,11 +104,29 @@ class GatewayController extends Controller {
             }
             $session['SecWebSocketProtocol'] = $connection->SecWebSocketProtocol;
             $connection->session =  Context::sessionEncode($session);
-
         };
-
-        $gateway->onConnect = function($connection){
-            var_dump('GateWay:onConnect:'.$connection->SecWebSocketProtocol);
+        /**
+         *  修改群发到组中的时候，需要对每个数据的peerId进行变更
+         * @param $connection TcpConnection
+         * @param $body
+         * @param bool $raw
+         */
+        $gateway->onGroupConnectionSend = function($connection,$body,$raw = false){
+            if(empty($connection->session)){
+                $session = array();
+            }
+            else{
+                $session = Context::sessionDecode($connection->session);
+            }
+            //修改peerId
+            if($session && $session['peerId']) {
+                $msg = new \GenericCommand();
+                $msg->parseFromString($body);
+                $msg->setPeerId($session['peerId']);
+                //$msg->dump();
+                $body = $msg->serializeToString();
+            }
+            $connection->send($body,$raw);
         };
         if(!defined('GLOBAL_START'))
         {
@@ -149,7 +187,7 @@ class GatewayController extends Controller {
             echo "clientQueueWorker\r\n";
             $i = 0;
             // 建立socket连接到内部推送端口
-            $client = stream_socket_client('tcp://127.0.0.1:2208', $errno, $errmsg, 1);
+            $client = stream_socket_client('tcp://'.C('RTM_SOCKET_URL'), $errno, $errmsg, 1);
             //订阅客户端推送事件 ，进程挂住了
             $this->clientQueueScribe(function($instance,$channel_name,$message)use(&$i,& $client){
                 //收到消息后，发送内部消息
@@ -158,7 +196,7 @@ class GatewayController extends Controller {
                 //如果失败，重试一次
                 if($result === false){
                     log_write('reconnect:','clientQueueWorker');
-                    $client = stream_socket_client('tcp://127.0.0.1:2208', $errno, $errmsg, 1);
+                    $client = stream_socket_client('tcp://'.C('RTM_SOCKET_URL'), $errno, $errmsg, 1);
                     $result = fwrite($client, $this->frameEncode($message)); //重新再试一次
                     if($result === false){
                         log_write('resend error:','clientQueueWorker');

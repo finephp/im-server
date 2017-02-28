@@ -67,7 +67,8 @@ class Events
         if($businessWorker->id === 0){
             \Daemon\Service\RealtimeGateway::clearClients();
             //添加定时器,清除 redis 中无效 clients
-            \Workerman\Lib\Timer::add(1,function(){
+            \Daemon\Service\RealtimeGateway::clearClients();
+            \Workerman\Lib\Timer::add(60,function(){
                 \Daemon\Service\RealtimeGateway::clearClients();
             });
 
@@ -78,7 +79,36 @@ class Events
             $inner_text_worker->count = 4;
             $inner_text_worker->onMessage = function($connection, $message)
             {
+                /** @var $connection \Workerman\Connection\TcpConnection **/
+                //查看是否消息广播
+                if(strpos($message,'MESSAGE_BROAD:') === 0){
+                    $message = substr($message,14);
+                    $result = \Daemon\Service\RealtimeGateway::handleBroadMessage($message);
+                    if($result) {
+                        $connection->send($result);
+                    }
+                    return;
+                }
+                //查看是否发到聊天室中
+                elseif(strpos($message,'MESSAGE_GROUP:') === 0){
+                    $message = substr($message,14);
+                    $result = \Daemon\Service\RealtimeGateway::handleGroupMessage($message);
+                    if($result) {
+                        $connection->send($result);
+                    }
+                    return;
+                }
+                //其它命令
+                elseif(strpos($message,'CMD:') === 0){
+                    $message = substr($message,4);
+                    $result = \Daemon\Service\RealtimeGateway::handleCmdMessage($message);
+                    if($result) {
+                        $connection->send($result);
+                    }
+                    return;
+                }
                 echo "__________on:genericCmd:"."\n";
+                var_dump($message);
                 \Daemon\Service\RealtimeGateway::handleClientQueue($message);
             };
             echo colorize('start inner socket:'.$innerWokerIp,'SUCCESS')."\r\n";
