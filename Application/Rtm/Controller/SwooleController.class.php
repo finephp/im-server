@@ -53,7 +53,7 @@ class SwooleController extends Controller {
         $serv->on('start',function($serv){
             $title = "RealTime Swoole Server";
             cli_set_process_title($title);
-            echo $title.' start at:'.$serv->host.':'.$serv->port;
+            $this->show($title.' start at:'.$serv->host.':'.$serv->port);
             echo "\r\n";
         });
         $serv->start();
@@ -77,7 +77,7 @@ class SwooleController extends Controller {
         $response->header("X-Server", "Swoole");
         //获取api内容
         $resp = $this->getApiData();
-        if(!$resp) {
+        if($resp === false) {
             //$response->header();
             $response->status(404);
             $response->end('[404]'.$path. ' not found.'."\r\n");
@@ -87,8 +87,8 @@ class SwooleController extends Controller {
     }
 
     protected function parseRequest($request){
-        $_GET = $request->get;
-        $_POST = $request->post;
+        $_GET = isset($request->get) ? $request->get : array();
+        $_POST = isset($request->post) ? $request->post : array();
         $_SERVER = array_merge(self::$_SERVER,array_change_key_case($request->server,CASE_UPPER));
         //处理一下header
         foreach($request->header as $k=>$v){

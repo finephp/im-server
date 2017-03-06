@@ -51,7 +51,7 @@ class CmdLogs extends CmdBase {
         foreach($logsList as $log){
             $logItem = new \LogItem();
             $logItem->setFrom($log['from']);
-            $logItem->setMsgId($log['msgId']);
+            $logItem->setMsgId($log['_id']);
             $logItem->setTimestamp(floor($log['createdAt']->sec*1000+($log['createdAt']->usec/1000)));
             $logItem->setData($log['data']);
             $logsMessage->appendLogs($logItem);

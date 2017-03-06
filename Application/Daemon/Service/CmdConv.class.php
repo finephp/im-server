@@ -110,20 +110,26 @@ class CmdConv extends CmdBase {
         );
         $data = array_merge($attrData,$data);
         $data = $model->create($data);
-        //查询是否有维一的聊天室名称
+        //查询是否有维一的成员组的聊天室
         $unique = $convMessage->getUnique();
         if(!$tr && $unique){
             $resultConv = $model->where(array(
                 'unique'=>true,
                 'tr'=>false,//非暂态聊天室
-                'name'=>$data['name'],
-                'c'=>$creater,
+                'm'=>array('eq',$data['m']),
+                //'c'=>$creater,
             ))->find();
             if($resultConv){
                 $cid = $resultConv['_id'];
                 $m = $resultConv['m'];
             }
         }
+        /*
+        var_dump($resultConv);
+        echo __METHOD__.":";
+        echo $model->_sql()."\r\n";
+        return;
+        */
         //如果没有，则创建对话
         if(empty($cid)) {
             /** @var $result \MongoId */
@@ -290,6 +296,8 @@ class CmdConv extends CmdBase {
         }
         $where = $convCommand->getWhere()->getData();
         $whereData = json_decode($where,true);
+        print_r(__METHOD__);
+        print_r($whereData);
         $model = self::_getConvModel();
         $where = array();
         if(!empty($whereData['objectId'])){
@@ -329,7 +337,7 @@ class CmdConv extends CmdBase {
         //压缩
 
         $flag = $convCommand->getFlag();
-        $flag = 1;//todo debug
+        //$flag = 1;//todo debug
         $resultList = $model->where($where)->select();
         //log_write($model->_sql(),__METHOD__);
         $data = array();
@@ -340,7 +348,7 @@ class CmdConv extends CmdBase {
             if($flag === 1){
                 unset($result['m']);
             }
-            //如果 withLastMessagesRefreshed 更新最后一条消息？
+            //如果 flag==2 : 代表 withLastMessagesRefreshed 是否需要返回最后一条消息
             //todo last
             if($flag === 2){
                 //查询最后一条消息
@@ -351,13 +359,15 @@ class CmdConv extends CmdBase {
                 //log_write($msgModel->_sql(),__METHOD__);
                 if($msgData) {
                     $result['msg'] = $msgData['data'];
+                    /*
                     $result['lm'] = array(
                         '__type' => 'Date',
                         'iso' => date(DATE_ISO8601, $msgData['updatedAt']->sec)
                     );
+                    */
                     $result['msg_from'] = $msgData['from'];
                     $result['msg_mid'] = $msgData['_id'];
-                    $result['timestamp'] = self::getTimestamp($msgData['createdAt']);
+                    $result['msg_timestamp'] = self::getTimestamp($msgData['createdAt']);
                 }
             }
             $data[] = array_merge($result,array(
@@ -367,6 +377,7 @@ class CmdConv extends CmdBase {
                 'objectId'=>$cid
             ));
         }
+        print_r($data);
         return json_encode($data);
     }
     /**

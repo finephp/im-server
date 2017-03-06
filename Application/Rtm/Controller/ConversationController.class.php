@@ -22,4 +22,12 @@ class ConversationController extends BaseController {
         return $this->response($result);
     }
 
+    /**
+     * 查询
+     */
+    public function query(){
+        $service = RealtimeRestService::getInstance();
+        return $service->queryConversation($_GET);
+    }
+
 }

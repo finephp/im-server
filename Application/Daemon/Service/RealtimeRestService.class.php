@@ -43,7 +43,7 @@ class RealtimeRestService{
         $message = $request['message'];
         $tr = $request['transient'];
         //查询聊天室
-        $convInfo = $this->_getConversation($conv_id);
+        $convInfo = $this->_getConversationByid($conv_id);
         if(!$convInfo || empty($convInfo['sys'])){
             return self::responseError('SYSTEM_CONVERSATION_REQUIRED',4313);
         }
@@ -207,7 +207,7 @@ class RealtimeRestService{
         return $new_resp;
     }
 
-    protected function _getConversation($cid)
+    protected function _getConversationByid($cid)
     {
         $model = Db::MongoModel('Rtm_Conversation');
         try {
@@ -329,6 +329,54 @@ class RealtimeRestService{
         }
         E('{}');
         return false;
+    }
+
+    /**
+     * @param $whereData
+     * $whereData['m']
+     * $whereData['cid']
+     * $whereData['name']
+     * @return mixed|null
+     */
+    public function queryConversation($whereData){
+        $cid = $whereData['cid'];
+        $where = array();
+        if(!empty($cid)){
+            $where['_id'] = $cid;
+        }
+        $unique = !empty($whereData['unique']);
+        if(!empty($whereData['members'])){
+            $m = explode(',',$whereData['members']);
+            if($unique){
+                $where['unique'] = true;
+                $where['m'] = array('eq',$m);
+            }
+            else{
+                $where['m'] = array('all',$m);
+            }
+        }
+        if(!empty($whereData['name'])){
+            $where['name'] = $whereData['name'];
+        }
+        $model = Db::MongoModel('Rtm_Conversation');
+        $model->limit(10);
+        try {
+            $result = $model->field('name,objectId')->where($where)->select()
+            or $result = array();
+            $data = array();
+            foreach($result as &$v){
+                $v['cid'] = $v['_id'];
+                unset($v['_id']);
+                $data[] = $v;
+            }unset($v);
+            $result = json_encode(array(
+                'code'=>0,
+                'data'=>$data,
+            ));
+            return $result;
+        }catch(\Exception $e){
+            return null;
+        }
     }
 }
 
