@@ -63,24 +63,9 @@ class CmdDirect extends CmdBase {
             $resp->setAckMessage($ackMsg);
             return $this->pushClientQueue($resp);
         }
-        G('t1_start');
-        //插入消息数据表
-        $ip = !empty($_SERVER['remote_addr'])?$_SERVER['remote_addr']:'';
-        $messageModel = $this->_getMessageModel();
-        $data = array(
-            'convId' => $cid,
-            'from' => $genericCmd->getPeerId(),
-            'data' => $driectMessage->getMsg(),
-            'passed' => false,
-            'createdAt' => $this->nowTime,
-            'updatedAt' => $this->nowTime,
-            'ip'=>$ip
-        );
-        $result = $messageModel->add($data);
-        $msgId = $messageModel->getLastInsID();
-        G('t1_end');
-        echo colorize(__METHOD__.' insert message runtime:'.G('t1_start','t1_end'),'NOTE')."\r\n";
-        //log_write($messageModel->_sql(),__METHOD__);
+        //判断是否暂态消息
+        $msg_tr = $driectMessage->getTransient();
+        $msgId = createRandomStr(20);
         //处理返回信息
         $resp = new GenericCommand();
         $resp->setCmd(CommandType::ack);
@@ -92,31 +77,59 @@ class CmdDirect extends CmdBase {
         $ackMsg->setUid($msgId);
         $resp->setAckMessage($ackMsg);
         $this->pushClientQueue($resp);
-        //更新聊天室最后时间消息时间
-        G('t1_start');
-        $convModel = $this->_getConvModel();
-        $convModel->where(array(
-            '_id' => $cid
-        ))->save(array(
-            'lm' => $this->nowTime,
-        ));
-        G('t1_end');
-        echo colorize(__METHOD__.' updateConv runtime:'.G('t1_start','t1_end'),'NOTE')."\r\n";
+        //设置hook
+        HookService::messageReceived($genericCmd);
+        //如果cid被清空，则直接返回，
+        if(empty($driectMessage->getCid())){
+            return true;
+        }
+        //hook end
+        //如果是不是暂态消息，则要插到消息表数据库中,暂态消息不插表，也不更新表
+        //数据库操作，可以考虑异步执行 todo
+        if(empty($msg_tr)){
+            G('t1_start');
+            //插入消息数据表
+            $ip = !empty($_SERVER['remote_addr'])?$_SERVER['remote_addr']:'';
+            $messageModel = $this->_getMessageModel();
+            $data = array(
+                'convId' => $cid,
+                'msgId' => $msgId,
+                'from' => $genericCmd->getPeerId(),
+                'data' => $driectMessage->getMsg(),
+                'passed' => false,
+                'createdAt' => $this->nowTime,
+                'updatedAt' => $this->nowTime,
+                'ip'=>$ip
+            );
+            $result = $messageModel->add($data);
+            //$msgId = $messageModel->getLastInsID();
+            G('t1_end');
+            echo colorize(__METHOD__.' insert message runtime:'.G('t1_start','t1_end'),'NOTE')."\r\n";
+            //log_write($messageModel->_sql(),__METHOD__);
+            //更新聊天室最后时间消息时间
+            G('t1_start');
+            $convModel = $this->_getConvModel();
+            $convModel->where(array(
+                '_id' => $cid
+            ))->save(array(
+                'lm' => $this->nowTime,
+            ));
+            G('t1_end');
+            echo colorize(__METHOD__.' updateConv runtime:'.G('t1_start','t1_end'),'NOTE')."\r\n";
+        }
+        //以下是返回给其它客户端的
         //以下开始群发消息
         //如果是聊天室的消息，发送到群组之中
         if(!empty($convData['tr'])){
+            //防止用户掉线，强行把用户加到组之中吧 todo
             $this->emitDirectByCid($genericCmd,$msgId);
             return true;
         }
-        G('time_1_s');
         //查询在线的人
         $m = self::getOnlineSession($m);
-        G('time_1_e');
-        $runtime = G('time_1_s','time_1_e');
-        echo $runtime.'get allPeerId'."\r\n";
         G('time_1_s');
         $this->sendDirect($genericCmd,$m,$msgId);
-        /* todo 改成不要插到 这张表
+        /* 改成不要插到 这张表
         //插入到对话中的所有成员的记录
         $messageLogModel = $this->_getMessageLogsModel();
         $data = array(
@@ -207,7 +220,6 @@ class CmdDirect extends CmdBase {
         $respMsg->setCid($directMessage->getCid());
         $respMsg->setMsg($directMessage->getMsg());
         $respMsg->setTransient($directMessage->getTransient());
-        print_r($resp);
         $this->pushGroupQueue($resp,$directMessage->getCid(),$peerId);
     }
 

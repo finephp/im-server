@@ -377,29 +377,49 @@ function input_filter($str){
  * @params &$error:错误
  * @params &$opt:选项
  */
-function http_post($url,$data=null,&$error=null,$opt = array()){
-	$opt = array_merge(array(
-			'TIMEOUT'=>	30,
-			'METHOD'=>'POST',
-	),$opt);
-	//创建post请求参数
-	$socket = new \Common\Org\Net\FineCurl;
-	$socket->setopt('URL',$url);
-	$socket->setopt('TIMEOUT',$opt['TIMEOUT']);
-	$socket->setopt('METHOD',$opt['METHOD']);
-	if(is_array($data)){
-		$data = http_build_query($data);
-	}
-	log_write('request：'.$url.'data:：'.$data,'REMOTE');
-	$result = $socket->send($data);
-	$error = $socket->error();
-	//记录日志
-	if($error){
-		Log_write($error,'ERROR');
-	}
-    Log_write('response：'.(function_exists('mb_convert_encoding') ? mb_convert_encoding($result,'utf-8','utf-8,gbk'):$result),'REMOTE');
-	return $result;
+function curl_request($url,$data=null,&$error=null,$opt = array()){
+    $opt = array_merge(array(
+        'TIMEOUT'=>	30,
+        'CONNECTTIMEOUT'=>3,
+        'METHOD'=>'GET',
+    ),$opt);
+    //创建post请求参数
+    $ch = curl_init();
+    if($opt['METHOD'] == 'POST') {
+        curl_setopt($ch, CURLOPT_POST,true);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, $data);
+    }
+    else{
+        if($data){
+            $str = http_build_query($data);
+            if(strpos($url,'?')){
+                $url .= '&'.$str;
+            }else{
+                $url .= '?'.$str;
+            }
+        }
+    }
+    if(!empty($opt['HEADERS'])){
+        curl_setopt($ch,CURLOPT_HEADER,true);
+        curl_setopt($ch,CURLOPT_HTTPHEADER, $opt['HEADERS']);
+    }
+    curl_setopt($ch,CURLOPT_TIMEOUT,$opt['TIMEOUT']);
+    curl_setopt($ch,CURLOPT_CONNECTTIMEOUT,$opt['CONNECTTIMEOUT']);
+    curl_setopt($ch, CURLOPT_URL, $url);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    $response = curl_exec($ch);
+    $error = curl_error($ch);
+    $headerSize = curl_getinfo($ch, CURLINFO_HEADER_SIZE);
+    $code = curl_getinfo($ch,CURLINFO_HTTP_CODE);
+    $body = substr($response, $headerSize);
+    //$header = substr($response, 0, $headerSize);
+    if($code !== 200) {
+        $error = empty($error)?'error['.$code.']'.$body:$error;
+        return false;
+    }
+    return $body;
 }
+
 
 function get_base_url_dir(){
     return '//'.$_SERVER['HTTP_HOST'].dirname($_SERVER['PHP_SELF']);
@@ -520,4 +540,18 @@ function debug_factory($name,$status = '37m'){
            echo $name . ' ' . $str1 . ' ' . $str2 . "\r\n";
        }
     };
+}
+
+/**
+ *@blog <www.phpddt.com>
+ */
+function createRandomStr($length){
+    $str = '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ';//62个字符
+    $strlen = 62;
+    while($length > $strlen){
+        $str .= $str;
+        $strlen += 62;
+    }
+    $str = str_shuffle($str);
+    return substr($str,0,$length);
 }

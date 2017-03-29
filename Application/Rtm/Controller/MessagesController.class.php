@@ -109,7 +109,7 @@ class MessagesController extends BaseController {
                 'conv-id' =>   $v['convId'],
                 'data' =>      $v['data'],
                 'from' =>     $v['convId'],
-                'msg-id' =>  $v['_id'],
+                'msg-id' =>  $v['msgId'],
                 'is-conv' =>  0,
                 'is-room' => 0,
                 'to' =>  '',

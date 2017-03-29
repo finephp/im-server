@@ -91,14 +91,14 @@ class RealtimeGateway {
             var_dump(base64_encode($packed));
             return;
         }
-        /*//todo debug
+        //todo debug
         echo "connection id[".$connection->id."]:in:";
         ob_start();
         $genericCmd->dump();
         $in_str = ob_get_clean();
         //log_write($in_str);
         echo $in_str."\r\n";
-        */
+
         $appId = $genericCmd->getAppId();
         $cmd = $genericCmd->getCmd();
         $this->connection = $connection;

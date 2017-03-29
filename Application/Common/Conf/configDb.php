@@ -34,4 +34,13 @@ if(getenv('DB_PORT')){
     $config['DB_CONFIG_MONGO']['DB_PORT'] = getenv('DB_PORT');
 }
 
+//设置环境变量
+if(getenv('DB_NAME')){
+    $config['DB_CONFIG_MONGO']['DB_NAME'] = getenv('DB_NAME');
+}
+
+//环境变量云函数地址
+if(getenv('CLOUD_URL')){
+    $config['CLOUD_URL'] = getenv('CLOUD_URL');
+}
 return $config;

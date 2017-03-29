@@ -98,7 +98,7 @@ class CmdConv extends CmdBase {
         $m = $convMessage->getM();
         $creater = $genericCmd->getPeerId();
         $unique = $convMessage->getUnique();
-        $tr = $convMessage->getTransient();
+        $tr = !empty($convMessage->getTransient());
             //创建对话
         $attrData = $convMessage->getAttr()->getData();
         $attrData = json_decode($attrData,true) or $attrData = array();
@@ -370,14 +370,18 @@ class CmdConv extends CmdBase {
                     $result['msg_timestamp'] = self::getTimestamp($msgData['createdAt']);
                 }
             }
+            //$lm = empty($result['lm'])?'':date(DATE_ISO8601,$result['lm']->sec);
+            $lm = empty($result['lm']) ? null:array(
+                '__type' => 'Date',
+                'iso' => date(DATE_ISO8601, $result['lm']->sec)
+            );
             $data[] = array_merge($result,array(
                 'updatedAt' => date(DATE_ISO8601,$result['updatedAt']->sec),
                 'createdAt' => date(DATE_ISO8601,$result['createdAt']->sec),
-                'lm' => empty($result['lm'])?'':date(DATE_ISO8601,$result['lm']->sec),
+                'lm' => $lm,
                 'objectId'=>$cid
             ));
         }
-        print_r($data);
         return json_encode($data);
     }
     /**

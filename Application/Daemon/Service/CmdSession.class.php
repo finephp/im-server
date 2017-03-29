@@ -154,7 +154,7 @@ class CmdSession extends CmdBase {
                 $_arr = array();
                 $_arr['unread'] = count($convLogs);
                 $_arr['convId'] = $logs['convId'];
-                $_arr['msgId'] = $logs['_id'];
+                $_arr['msgId'] = $logs['msgId'];
                 $_arr['timestamp'] = self::getTimestamp($logs['createdAt']);
                 $logsResult[] = $_arr;
             }

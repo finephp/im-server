@@ -101,6 +101,12 @@ abstract class CmdBase{
         else{
             $exclude_client_id = null;
         }
+        echo __METHOD__.print_r(
+            array(
+                'cid' => $cid,
+                'clients'=>Gateway::getClientInfoByGroup($cid)
+            )
+            ,true);
         Gateway::sendToGroup($cid,$data,$exclude_client_id);
         return true;
     }
