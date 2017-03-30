@@ -91,16 +91,18 @@ class RealtimeGateway {
             var_dump(base64_encode($packed));
             return;
         }
-        //todo debug
-        echo "connection id[".$connection->id."]:in:";
-        ob_start();
-        $genericCmd->dump();
-        $in_str = ob_get_clean();
-        //log_write($in_str);
-        echo $in_str."\r\n";
-
         $appId = $genericCmd->getAppId();
         $cmd = $genericCmd->getCmd();
+        //只有cmd 为非14记录
+        if($cmd != 14) {
+            echo "connection id[" . $connection->id . "]:in:";
+            ob_start();
+            $genericCmd->dump();
+            $in_str = ob_get_clean();
+            //log_write($in_str);
+            echo $in_str . "\r\n";
+        }
+
         $this->connection = $connection;
         switch($cmd){
             // rcp 保持心跳？
@@ -137,14 +139,16 @@ class RealtimeGateway {
     }
 
     /**
-     * @param $data
+     * @param $data GenericCommand
      * @param null|RealtimeConnection $connection
      */
     public function send($data,$connection = null){
         if(empty($connection)){
             $connection = & $this->connection;
         }
-        echo 'sendto id:'.$connection->peerId.'=>'.$connection->id."\r\n";
+        if($data->getCmd() != 14) {
+            echo 'sendto id:' . $connection->peerId . '=>' . $connection->id . "\r\n";
+        }
         Gateway::sendToClient($connection->id,$this->encodeResp($data));
     }
 

@@ -84,14 +84,19 @@ class RealtimeWebsocket {
             var_dump(base64_encode($packed));
             return;
         }
-        ob_start();
-        echo "connection id[".$connection->id."]:in:";
-        $genericCmd->dump();
-        $in_str = ob_get_clean();
-        log_write($in_str);
-        echo $in_str."\r\n";
         $appId = $genericCmd->getAppId();
         $cmd = $genericCmd->getCmd();
+
+        //记录日志 ,只记录 14 的
+        if($cmd != 14) {
+            ob_start();
+            echo "connection id[" . $connection->id . "]:in:";
+            $genericCmd->dump();
+            $in_str = ob_get_clean();
+            log_write($in_str);
+            echo $in_str . "\r\n";
+            //结束日志
+        }
         $other = array(
             'ip'=> $connection->getRemoteIp()
         );

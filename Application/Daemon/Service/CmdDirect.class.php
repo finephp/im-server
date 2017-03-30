@@ -167,8 +167,9 @@ class CmdDirect extends CmdBase {
 
     //发送消息
     /**
-     * @param $client_id
      * @param $genericCmd GenericCommand
+     * @param $m array
+     * @param $msgId string
      */
     public function sendDirect($genericCmd,$m,$msgId){
         $peerId = $genericCmd->getPeerId();
@@ -187,7 +188,7 @@ class CmdDirect extends CmdBase {
         foreach($m as $to) {
             //不要发给自已当前的client
             if($to == $peerId){
-                continue;
+                //continue;
             }
             $resp->setPeerId($to);
             G("t1_s");
@@ -195,7 +196,7 @@ class CmdDirect extends CmdBase {
             G("t1_e");
             $runtime = G('t1_s','t1_e');
             //todo debug
-            if($runtime>0.01){
+            if($runtime>0.1){
                 echo $runtime.":pushClientQueue:{$i}\r\n";
                 $i++;
             }
@@ -204,8 +205,8 @@ class CmdDirect extends CmdBase {
 
     /**
      * 发送到群组中
-     * @param $client_id
      * @param $genericCmd GenericCommand
+     * @param $msgId String
      */
     public function emitDirectByCid($genericCmd,$msgId){
         $peerId = $genericCmd->getPeerId();

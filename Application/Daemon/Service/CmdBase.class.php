@@ -68,16 +68,24 @@ abstract class CmdBase{
 
     /**
      * @param $data GenericCommand|string
+     * @param $client_id string 如果有的话
      * @return bool
      */
-    protected function pushClientQueue($data){
+    protected function pushClientQueue($data,$client_id = null){
         //如果不进redis的话，直接调用gateway发送
         if(defined('ENV_NOREDIS')){
             //如果有i，发送到当前的
             if($data->getI()){
                 Gateway::sendToCurrentClient($this->encodeResp($data));
             }else{
-                Gateway::sendToUid($data->getPeerId(), $this->encodeResp($data));
+                //如果没有有指定client_id，按peerId发送（可能会引起重复数据)
+                if(empty($client_id)) {
+                    Gateway::sendToUid($data->getPeerId(), $this->encodeResp($data));
+                }
+                //按照client_id发送
+                else{
+                    Gateway::sendToClient($client_id, $this->encodeResp($data));
+                }
             }
             return true;
         }
@@ -88,15 +96,17 @@ abstract class CmdBase{
     }
 
     /**
-     * @param $data GenericCommand
+     * 按照组群发
+     * @param $dataRes GenericCommand
      * @param $cid string
      * @param $exclude_peerid array
      * @return bool
      */
-    protected function pushGroupQueue($data,$cid,$exclude_peerid = null){
-        $data = $this->encodeResp($data);
+    protected function pushGroupQueue($dataRes,$cid,$exclude_peerid = null){
+        $data = $this->encodeResp($dataRes);
         if($exclude_peerid) {
-            $exclude_client_id = Gateway::getClientIdByUid($exclude_peerid);
+            //$exclude_client_id = Gateway::getClientIdByUid($exclude_peerid);
+            $exclude_client_id = null;
         }
         else{
             $exclude_client_id = null;
@@ -107,6 +117,14 @@ abstract class CmdBase{
                 'clients'=>Gateway::getClientInfoByGroup($cid)
             )
             ,true);
+        //todo debug start
+        /*$clients = Gateway::getClientInfoByGroup($cid);
+        foreach($clients as $client_id => $client){
+            $dataRes->setPeerId($client['peerId']);
+            $this->pushClientQueue($dataRes,$client_id);
+        }
+        return true;*/
+        //todo debug end
         Gateway::sendToGroup($cid,$data,$exclude_client_id);
         return true;
     }
