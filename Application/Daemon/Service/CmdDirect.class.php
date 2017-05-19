@@ -64,7 +64,6 @@ class CmdDirect extends CmdBase {
             return $this->pushClientQueue($resp);
         }
         //判断是否暂态消息
-        $msg_tr = $driectMessage->getTransient();
         $msgId = createRandomStr(20);
         //处理返回信息
         $resp = new GenericCommand();
@@ -77,13 +76,19 @@ class CmdDirect extends CmdBase {
         $ackMsg->setUid($msgId);
         $resp->setAckMessage($ackMsg);
         $this->pushClientQueue($resp);
+        echo __METHOD__;
+
         //设置hook
+        $genericCmd->dump();//输出内容1
         HookService::messageReceived($genericCmd);
+        $genericCmd->dump();//输出内容2
+        //hook end
+
+        $msg_tr = $driectMessage->getTransient();
         //如果cid被清空，则直接返回，
         if(empty($driectMessage->getCid())){
             return true;
         }
-        //hook end
         //如果是不是暂态消息，则要插到消息表数据库中,暂态消息不插表，也不更新表
         //数据库操作，可以考虑异步执行 todo
         if(empty($msg_tr)){
@@ -96,7 +101,6 @@ class CmdDirect extends CmdBase {
                 'msgId' => $msgId,
                 'from' => $genericCmd->getPeerId(),
                 'data' => $driectMessage->getMsg(),
-                'passed' => false,
                 'createdAt' => $this->nowTime,
                 'updatedAt' => $this->nowTime,
                 'ip'=>$ip
@@ -112,7 +116,7 @@ class CmdDirect extends CmdBase {
             $convModel->where(array(
                 '_id' => $cid
             ))->save(array(
-                'lm' => $this->nowTime,
+                'lm' => self::getIsoDate(),
             ));
             G('t1_end');
             echo colorize(__METHOD__.' updateConv runtime:'.G('t1_start','t1_end'),'NOTE')."\r\n";
@@ -241,7 +245,7 @@ class CmdDirect extends CmdBase {
             'convId' => null,
             'from' => null,
             'data' => null,
-            'passed' => false,
+            //'passed' => false,
             'createdAt' => $this->nowTime,
             'updatedAt' => $this->nowTime,
         ),$data);

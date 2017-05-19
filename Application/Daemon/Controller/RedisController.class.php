@@ -32,7 +32,7 @@ class RedisController extends Controller {
         $ws_worker = new Worker();
         $ws_worker->name = APP_NAME.'.ReadQueueWorker:'.$queue;
         // 启动4个进程对外提供服务
-        $ws_worker->count = 4;
+        $ws_worker->count = C('APP_WORKER_COUNT');
         $ws_worker->onWorkerStart = function($task)use($queue)
         {
             $redisService = RedisService::getInstance();
@@ -54,6 +54,9 @@ class RedisController extends Controller {
                         echo colorize('readQueueWorker:'.$e->getMessage(),'FAILURE');
                         sleep(1);
                     }
+                }
+                else{
+                    usleep(200*1000);//休息100 豪秒
                 }
             }
 

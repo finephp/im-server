@@ -1,5 +1,6 @@
 <?php
 namespace Daemon\Controller;
+use Daemon\Service\RealtimeGateway;
 use Daemon\Service\RedisService;
 use GatewayWorker\BusinessWorker;
 use GatewayWorker\Lib\Context;
@@ -17,6 +18,14 @@ if(!IS_CLI){
 }
 //gater way
 class GatewayController extends Controller {
+    //初始化
+    public function _initialize(){
+        //重置avgv 这个很重要，只能运行一次
+        unset($_SERVER['argv'][1]);
+        global $argv;
+        $argv = array_values($_SERVER['argv']);
+        Worker::$pidFile = '/tmp/'.ACTION_NAME.'.gateway.pid';
+    }
     public function index(){
         $this->show(__METHOD__);
         echo 'run worker';
@@ -27,10 +36,6 @@ class GatewayController extends Controller {
         // 标记是全局启动
         define('GLOBAL_START', 1);
         ob_end_flush();
-        //重置avgv
-        unset($_SERVER['argv'][1]);
-        global $argv;
-        $argv = array_values($_SERVER['argv']);
 
         // 运行所有服务
         Worker::$pidFile = '/tmp/testWorker.gateway.pid';
@@ -45,18 +50,16 @@ class GatewayController extends Controller {
         // 标记是全局启动
         define('GLOBAL_START', 1);
         ob_end_flush();
-        //重置avgv
-        unset($_SERVER['argv'][1]);
-        global $argv;
-        $argv = array_values($_SERVER['argv']);
-
         //开启noredis模式
         if(getenv('ENV_NOREDIS') == 'true'){
             define('ENV_NOREDIS',true);
             echo "ENV_NOREDIS:true"."\r\n";
         }
+        //运行注册中心
+        if(getenv('GATEWAY_REGISTER_URL') == ''){
+            $this->registerWorker();
+        }
         $this->gatewayWorker();
-        $this->registerWorker();
         $this->businessWorker();
         $this->clientQueueWorker();
         // 运行所有服务
@@ -73,9 +76,9 @@ class GatewayController extends Controller {
         // gateway 进程
         $gateway = new Gateway("Websocket://0.0.0.0:8585");
         // 设置名称，方便status时查看
-        $gateway->name = 'ChatGateway';
+        $gateway->name = 'gatewayWorker';
         // 设置进程数，gateway进程数建议与cpu核数相同
-        $gateway->count = 4;
+        $gateway->count = C('APP_WORKER_COUNT');
         // 分布式部署时请设置成内网ip（非127.0.0.1）
         $gateway->lanIp = '127.0.0.1';
         // 内部通讯起始端口，假如$gateway->count=4，起始端口为4000
@@ -86,13 +89,13 @@ class GatewayController extends Controller {
         // 心跳数据
         $gateway->pingData = '';//base64_decode('CA4=');
         // 服务注册地址
-        $gateway->registerAddress = '127.0.0.1:1236';
+        $gateway->registerAddress = C('GATEWAY_REGISTER_URL');
 
         /**
          * @param $connection TcpConnection
          */
         $gateway->onBeforeClientMessage = function($connection){
-            $noBinary = isset($connection->SecWebSocketProtocol) && $connection->SecWebSocketProtocol=='lc.protobase64.3';
+            $noBinary = empty($connection->SecWebSocketProtocol) || $connection->SecWebSocketProtocol=='lc.protobase64.3';
             if(!$noBinary) {
                 $connection->websocketType = \Workerman\Protocols\Websocket::BINARY_TYPE_ARRAYBUFFER;
             }
@@ -105,6 +108,21 @@ class GatewayController extends Controller {
             $session['SecWebSocketProtocol'] = $connection->SecWebSocketProtocol;
             $connection->session =  Context::sessionEncode($session);
         };
+//        $gateway->onCmdSendToOne = function($connection,$body,$raw = false){
+//            if(empty($connection->session)){
+//                $session = array();
+//            }
+//            else{
+//                $session = Context::sessionDecode($connection->session);
+//            }
+////            print_r('onCmdSendToOne:start ');
+////            print_r($session);
+////            print_r('onCmdSendToOne:end ');
+//            //如果是js2的sdk，要把body转换成json
+//            if(strpos($session['ua'],'js/2.')===0){
+//                print_r($session['ua']);
+//            }
+//        };
         /**
          *  修改群发到组中的时候，需要对每个数据的peerId进行变更
          * @param $connection TcpConnection
@@ -118,15 +136,19 @@ class GatewayController extends Controller {
             else{
                 $session = Context::sessionDecode($connection->session);
             }
+            /*print_r('onGroupConnectionSend:start ');
+            print_r($session);
+            print_r('onGroupConnectionSend:end ');*/
             //修改peerId
             if($session && $session['peerId']) {
                 $msg = new \GenericCommand();
                 $msg->parseFromString($body);
                 $msg->setPeerId($session['peerId']);
                 //$msg->dump();
-                $body = $msg->serializeToString();
+                $body = RealtimeGateway::encodeResp($msg,$session);
             }
             $connection->send($body,$raw);
+            return true;
         };
         if(!defined('GLOBAL_START'))
         {
@@ -135,10 +157,11 @@ class GatewayController extends Controller {
     }
 
     /**
-     * todo register 服务
+     * register 服务 此服务只能有一个进程，分布式全靠这个服务了
      */
     public function registerWorker(){
         $register = new Register('text://0.0.0.0:1236');
+        $register->name = 'registerWorker';
         if(!defined('GLOBAL_START'))
         {
             Worker::runAll();
@@ -153,11 +176,11 @@ class GatewayController extends Controller {
         // bussinessWorker 进程
         $worker = new BusinessWorker();
         // worker名称
-        $worker->name = 'ChatBusinessWorker';
+        $worker->name = 'businessWorker';
         // bussinessWorker进程数量
-        $worker->count = 4;
+        $worker->count = C('APP_WORKER_COUNT');
         // 服务注册地址
-        $worker->registerAddress = '127.0.0.1:1236';
+        $worker->registerAddress = C('GATEWAY_REGISTER_URL');
 
         if(!defined('GLOBAL_START'))
         {
@@ -181,7 +204,7 @@ class GatewayController extends Controller {
      */
     public function clientQueueWorker(){
         $worker = new Worker();
-        $worker->count = 4;
+        $worker->count = C('APP_WORKER_COUNT');
         $worker->name = 'clientQueueWorker';
         $worker->onWorkerStart = function(){
             echo "clientQueueWorker\r\n";
@@ -208,6 +231,22 @@ class GatewayController extends Controller {
                 }
             });
         };
+    }
+
+    public function flashPolicyWorker(){
+        $flash_policy = new Worker('tcp://0.0.0.0:843');
+        $flash_policy->name = 'flashPolicyWorker';
+        /* @param $connection TcpConnection */
+        $flash_policy->onMessage = function($connection, $message)
+        {
+            $connection->send('<?xml version="1.0"?><cross-domain-policy><site-control permitted-cross-domain-policies="all"/><allow-access-from domain="*" to-ports="*"/></cross-domain-policy>'."\0");
+            $connection->close();
+        };
+        if(!defined('GLOBAL_START'))
+        {
+            Worker::$pidFile = '/tmp/flashPolicyWorker.gateway.pid';
+            Worker::runAll();
+        }
     }
 
     /**

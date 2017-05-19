@@ -23,6 +23,7 @@ class RealtimeGateway {
     public $client_id;
     public $data;
     public $noBinary;
+    public $SecWebSocketProtocol = '';
 
     /**
      * @param $client_id
@@ -30,9 +31,13 @@ class RealtimeGateway {
      */
     static function handleMessage($client_id,$data){
         $connection = self::getConnection($client_id);
-        $noBinary = isset($connection->SecWebSocketProtocol) && $connection->SecWebSocketProtocol=='lc.protobase64.3';
+        $noBinary = empty($connection->SecWebSocketProtocol) || $connection->SecWebSocketProtocol=='lc.protobase64.3';
         //echo $connection->SecWebSocketProtocol;
-        if($noBinary){
+        //v2版
+        if(empty($connection->SecWebSocketProtocol)){
+            $packed = V2Transfer::transCmdIn($data);
+        }
+        elseif($noBinary){
             $packed = base64_decode($data);
         }
         else{
@@ -42,6 +47,7 @@ class RealtimeGateway {
         }
         $service = new self();
         $service->noBinary = $noBinary;
+        $service->SecWebSocketProtocol = $connection->SecWebSocketProtocol;
         $service->handleGenericCommand($connection,$packed);
     }
 
@@ -57,7 +63,7 @@ class RealtimeGateway {
      * @param $resp GenericCommand
      * @return string
      */
-    public function encodeResp($resp){
+     public static function encodeResp($resp,$session=array()){
         /* todo debug
         ob_start();
         $resp->dump();
@@ -66,6 +72,14 @@ class RealtimeGateway {
         echo $respstr;
         unset($respstr);
         */
+        //echo __METHOD__,print_r($session,true);
+        if($session){
+            //if(strpos($session['ua'],'js/2.')===0){
+            if(empty($session['SecWebSocketProtocol'])){
+                $new_resp = V2Transfer::transCmdOut($resp);
+                return $new_resp;
+            }
+        }
         $new_resp = $resp->serializeToString();
         //这个地方要注意 todo 可能在web版中会有问题
         //$new_resp .= pack('H*','EA0600');
@@ -79,22 +93,36 @@ class RealtimeGateway {
 
     /**
      * @param $connection RealtimeConnection
-     * @param $packed
+     * @param $packed GenericCommand|string
      */
     public function handleGenericCommand($connection,$packed){
-        $genericCmd  = new GenericCommand();
-        try {
-            $genericCmd->parseFromString($packed);
-        } catch (\Exception $e) {
-            //die('Parse error: ' . $e->getMessage());
-            echo 'Parse error: ' . $e->getMessage();
-            var_dump(base64_encode($packed));
-            return;
+        //如果是字符串
+        if(is_string($packed)) {
+            $genericCmd = new GenericCommand();
+            try {
+                $genericCmd->parseFromString($packed);
+            } catch (\Exception $e) {
+                //die('Parse error: ' . $e->getMessage());
+                echo 'Parse error: ' . $e->getMessage();
+                var_dump(base64_encode($packed));
+                return;
+            }
+        }
+        else{
+            $genericCmd = $packed;
         }
         $appId = $genericCmd->getAppId();
         $cmd = $genericCmd->getCmd();
-        //只有cmd 为非14记录
-        if($cmd != 14) {
+        if(
+            //只有cmd 为非14记录
+            $cmd == 14
+            //查询人数的不要记 1 , 43
+            || ($cmd == CommandType::conv && $genericCmd->getOp() == OpType::count)
+        ){
+
+        }
+        //以下要记录日志
+        else {
             echo "connection id[" . $connection->id . "]:in:";
             ob_start();
             $genericCmd->dump();
@@ -104,6 +132,10 @@ class RealtimeGateway {
         }
 
         $this->connection = $connection;
+        if(!is_int($cmd)){
+            echo 'CMD is empty';
+            return;
+        }
         switch($cmd){
             // rcp 保持心跳？
             case 14:
@@ -143,13 +175,15 @@ class RealtimeGateway {
      * @param null|RealtimeConnection $connection
      */
     public function send($data,$connection = null){
+        $session = array();
         if(empty($connection)){
             $connection = & $this->connection;
+            $session = $_SESSION;
         }
         if($data->getCmd() != 14) {
             echo 'sendto id:' . $connection->peerId . '=>' . $connection->id . "\r\n";
         }
-        Gateway::sendToClient($connection->id,$this->encodeResp($data));
+        Gateway::sendToClient($connection->id,$this->encodeResp($data,$session));
     }
 
     public function pushServerQueue($data,$queue = ''){
@@ -206,7 +240,7 @@ class RealtimeGateway {
         $peerId = $genericCmd->getPeerId();
         $sessionMessage = $genericCmd->getSessionMessage();
         $tag = $sessionMessage->getTag();
-        RealtimeGatewayClients::register($peerId,$connection,$tag);
+        RealtimeGatewayClients::register($peerId,$connection,$tag,$sessionMessage->getUa());
         //处理 tag 冲突的connections
         $conflict = RealtimeGatewayClients::getConflictConnection($peerId,$connection,$tag);
         if($conflict){

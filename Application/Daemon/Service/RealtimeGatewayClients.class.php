@@ -16,12 +16,15 @@ class RealtimeGatewayClients{
      * @param $user string
      * @param $connection RealtimeConnection
      * @param $tag String
+     * @param $ua String
      */
-    static function register($user,&$connection,$tag = ''){
+    static function register($user,&$connection,$tag = '',$ua = ''){
         echo colorize(__METHOD__.':'."\r\n",'SUCCESS');
         $id = $connection->id;
-        $_SESSION['tag'] = $tag;    //保存session
+        $_SESSION['tag'] = $tag;    //保存session tag
+        $_SESSION['ua'] = $ua;//保存session ua
         $_SESSION['peerId'] = $user;//保存session
+        echo __METHOD__,':session:',print_r($_SESSION,true);
         //保存到全局redis中 //
         $result = RedisService::getInstance()->savePeerClient($user,$id);
         Gateway::bindUid($id,$user);

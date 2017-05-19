@@ -64,7 +64,7 @@ class CmdConv extends CmdBase {
             case OpType::status:// 49
                 return $cmd->opStatus($genericCmd);
                 break;
-            case OpType::count://50
+            case OpType::count://43
                 return $cmd->opCount($genericCmd);
                 break;
             default:
@@ -102,6 +102,11 @@ class CmdConv extends CmdBase {
             //创建对话
         $attrData = $convMessage->getAttr()->getData();
         $attrData = json_decode($attrData,true) or $attrData = array();
+        //加入创建人
+        if($creater) {
+            array_push($m, $creater);
+        }
+        array_unique($m);
         $data = array(
             'm' => $m,
             'c' => $creater,
@@ -296,10 +301,18 @@ class CmdConv extends CmdBase {
         }
         $where = $convCommand->getWhere()->getData();
         $whereData = json_decode($where,true);
-        print_r(__METHOD__);
-        print_r($whereData);
         $model = self::_getConvModel();
         $where = array();
+        //处理特殊的 and 事件
+        if(!empty($whereData['$and'])){
+            $where_and = $whereData['$and'];
+            foreach($where_and as $v){
+                if(is_array($v)) {
+                    $whereData = array_merge($whereData, $v);
+                }
+            }
+        }
+
         if(!empty($whereData['objectId'])){
             $where['_id'] = $whereData['objectId'];
         }
@@ -334,11 +347,22 @@ class CmdConv extends CmdBase {
             }
             $model->order($sort.' '.$orderby);
         }
-        //压缩
+        //压缩,成员
 
         $flag = $convCommand->getFlag();
         //$flag = 1;//todo debug
-        $resultList = $model->where($where)->select();
+        try {
+            $resultList = $model->where($where)->select();
+        }catch (\Exception $e){
+            $resultList = array();
+        }
+        if(empty($resultList)){
+            $resultList = array();
+            print_r(__METHOD__);
+            echo " resultList is empty"."\r\n";
+            print_r($whereData);
+            print_r($model->_sql());
+        }
         //log_write($model->_sql(),__METHOD__);
         $data = array();
         foreach($resultList as $result){
@@ -357,6 +381,7 @@ class CmdConv extends CmdBase {
                     'convId'=>$cid
                 ))->order('createdAt desc')->find();
                 //log_write($msgModel->_sql(),__METHOD__);
+                $result['msg'] = null;
                 if($msgData) {
                     $result['msg'] = $msgData['data'];
                     /*
@@ -371,10 +396,12 @@ class CmdConv extends CmdBase {
                 }
             }
             //$lm = empty($result['lm'])?'':date(DATE_ISO8601,$result['lm']->sec);
-            $lm = empty($result['lm']) ? null:array(
-                '__type' => 'Date',
-                'iso' => date(DATE_ISO8601, $result['lm']->sec)
-            );
+            $lm = empty($result['lm']) ? null:
+                (is_array($result['lm'])?$result['lm']:array(
+                    '__type' => 'Date',
+                    'iso' => date(DATE_ISO8601, $result['lm']->sec)
+                ))
+            ;
             $data[] = array_merge($result,array(
                 'updatedAt' => date(DATE_ISO8601,$result['updatedAt']->sec),
                 'createdAt' => date(DATE_ISO8601,$result['createdAt']->sec),
@@ -441,10 +468,20 @@ class CmdConv extends CmdBase {
         //查询数量
         $convMessage = $genericCmd->getConvMessage();
         $cid = $convMessage->getCid();
-        //查找聊天室信息
+        //查找聊天室在线人数，或者会话中人数
         $model = self::_getConvModel();
         $result = $model->find($cid);
-        $count = count($result['m']);
+        if(!$result){
+            $count = 0;
+        }
+        //如果普通会话
+        elseif(empty($result['tr'])){
+            $count = count($result['m']);
+        }
+        //暂态聊天室的连接数
+        else{
+            $count = Gateway::getClientCountByGroup($cid);
+        }
         $convMessage->setCount($count);
         $resp = new GenericCommand();
         $resp->setCmd($genericCmd->getCmd());
@@ -464,6 +501,18 @@ class CmdConv extends CmdBase {
         $convMessage = $genericCmd->getConvMessage();
         $m = $convMessage->getM();
         $cid = $convMessage->getCid();
+        if(empty($cid)){
+            //处理返回信息
+            $resp = new GenericCommand();
+            $resp->setCmd(CommandType::error);
+            $resp->setI($genericCmd->getI());
+            $resp->setPeerId($genericCmd->getPeerId());
+            $msg = new \ErrorCommand();
+            $msg->setCode(4401);
+            $msg->setReason('INVALID_CONV_ID');
+            $resp->setErrorMessage($msg);
+            return $this->pushClientQueue($resp);
+        }
         $model = $this->_getConvModel();
         //获取聊天室信息
         $convInfo = $this->_getConversation($cid);
@@ -474,14 +523,9 @@ class CmdConv extends CmdBase {
         if(!empty($convInfo['tr'])){
             if(!empty($_SERVER['GATEWAY_CLIENT_ID'])) {
                 Gateway::joinGroup($_SERVER['GATEWAY_CLIENT_ID'],$cid);
-                $tmp = new GenericCommand();
-                $tmp->setCmd(14);
-                $tmp->setOp(OpType::added);
-                $tmp->setPeerId($genericCmd->getPeerId());
-                $this->pushGroupQueue($tmp,$cid);
             }
         }
-        else {
+       else {
             //更新数据库中的对话成员
             $data = $model->create(array(
                 'm' => array('addToSet', array('$each' => $m))
@@ -496,6 +540,9 @@ class CmdConv extends CmdBase {
         $resp->setI($genericCmd->getI());
         $resp->setPeerId($genericCmd->getPeerId());
         $resp->setOp(OpType::added);//10
+        $message = new ConvCommand();
+        $message->setCid($cid);
+        $resp->setConvMessage($message);
         $this->pushClientQueue($resp);
         return;//[todo debug]
 
@@ -537,6 +584,9 @@ class CmdConv extends CmdBase {
         $resp->setI($genericCmd->getI());
         $resp->setPeerId($genericCmd->getPeerId());
         $resp->setOp(OpType::removed);//11
+        $message = new ConvCommand();
+        $message->setCid($cid);
+        $resp->setConvMessage($message);
         $this->pushClientQueue($resp);
         //查询数据库
         $result = $this->_getConversation($cid);

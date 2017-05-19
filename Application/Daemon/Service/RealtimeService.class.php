@@ -19,25 +19,25 @@ class RealtimeService{
         $service->handleGenericCommand($data);
         unset($service);
     }
-
-    public function encodeResp($resp){
-        $new_resp = $resp->serializeToString();
-        //这个地方要注意 todo 可能在web版中会有问题
-        //$new_resp .= pack('H*','EA0600');
-        if($this->noBinary) {
-            $new_resp = base64_encode($new_resp);
-        }
-        /*
-        $connection = $_SESSION['connection'];
-        ob_start();
-        echo "out: connection id:".$connection->id.':';
-        $resp->dump();
-        $respstr = ob_get_clean();
-        log_write($respstr);
-        echo $respstr;
-        */
-        return $new_resp;
-    }
+//
+//    public function encodeResp($resp){
+//        $new_resp = $resp->serializeToString();
+//        //这个地方要注意 todo 可能在web版中会有问题
+//        //$new_resp .= pack('H*','EA0600');
+//        if($this->noBinary) {
+//            $new_resp = base64_encode($new_resp);
+//        }
+//        /*
+//        $connection = $_SESSION['connection'];
+//        ob_start();
+//        echo "out: connection id:".$connection->id.':';
+//        $resp->dump();
+//        $respstr = ob_get_clean();
+//        log_write($respstr);
+//        echo $respstr;
+//        */
+//        return $new_resp;
+//    }
 
     /**
      * @param $packed
@@ -102,9 +102,9 @@ class RealtimeService{
             echo colorize('CMD:'.$cmd.' op:'.$genericCmd->getOp().' runtime time long :'.$runtime ,'WARNING')." \r\n";
         }
         else{
-            echo colorize('CMD:'.$cmd.' op:'.$genericCmd->getOp().' runtime:'.$runtime,'SUCCESS')."\r\n";
+            // echo colorize('CMD:'.$cmd.' op:'.$genericCmd->getOp().' runtime:'.$runtime,'SUCCESS')."\r\n";
         }
-        if($runtime>=0.1){
+        if($runtime >= 1){
             log_write('CMD:'.$cmd.' op:'.$genericCmd->getOp().' runtime time long :'.$runtime,'LONG_TIME');
         }
         if($cmd == 2){

@@ -170,6 +170,9 @@ class RedisService{
                 if($result) {
                     call_user_func($callback, $this->redis,self::CLIENT_QUEUE,$result);
                 }
+                else{
+                    usleep(200*1000);//休息 100 毫秒
+                }
             } catch (\Exception $e) {
                 echo $e->getMessage();
                 log_write($e->getMessage(), __METHOD__);

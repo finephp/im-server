@@ -51,15 +51,23 @@ abstract class CmdBase{
      * @param $resp
      * @return string
      */
-    protected function encodeResp($resp){
+    protected function encodeResp($resp,$session = array()){
         /**  todo debug
         ob_start();
-        echo 'encodeResp:';
+        echo __METHOD__;
         $resp->dump();
         $respstr = ob_get_clean();
         //log_write($respstr);
         echo $respstr;
-         */
+        */
+        //echo __METHOD__,print_r($session,true);
+        if($session){
+            //if(strpos($session['ua'],'js/2.')===0){
+            if(empty($session['SecWebSocketProtocol'])){
+                $new_resp = V2Transfer::transCmdOut($resp);
+                return $new_resp;
+            }
+        }
         $new_resp = $resp->serializeToString();
         //这个地方要注意 todo 可能在web版中会有问题
         //$new_resp .= pack('H*','EA0600');
@@ -72,11 +80,14 @@ abstract class CmdBase{
      * @return bool
      */
     protected function pushClientQueue($data,$client_id = null){
+        if(empty($client_id) && !empty($_SERVER['GATEWAY_CLIENT_ID'])){
+            $client_id = $_SERVER['GATEWAY_CLIENT_ID'];
+        }
         //如果不进redis的话，直接调用gateway发送
         if(defined('ENV_NOREDIS')){
             //如果有i，发送到当前的
             if($data->getI()){
-                Gateway::sendToCurrentClient($this->encodeResp($data));
+                Gateway::sendToCurrentClient($this->encodeResp($data,$_SESSION));
             }else{
                 //如果没有有指定client_id，按peerId发送（可能会引起重复数据)
                 if(empty($client_id)) {
@@ -84,7 +95,7 @@ abstract class CmdBase{
                 }
                 //按照client_id发送
                 else{
-                    Gateway::sendToClient($client_id, $this->encodeResp($data));
+                    Gateway::sendToClient($client_id, $this->encodeResp($data,$_SESSION));
                 }
             }
             return true;
@@ -111,12 +122,12 @@ abstract class CmdBase{
         else{
             $exclude_client_id = null;
         }
-        echo __METHOD__.print_r(
+        /*echo __METHOD__.print_r(
             array(
                 'cid' => $cid,
                 'clients'=>Gateway::getClientInfoByGroup($cid)
             )
-            ,true);
+            ,true);*/
         //todo debug start
         /*$clients = Gateway::getClientInfoByGroup($cid);
         foreach($clients as $client_id => $client){
@@ -151,10 +162,16 @@ abstract class CmdBase{
 
     /**
      * 获取在线 session
-     * @param $m
+     * @param $m array 要查询的peerid
      * @return string[]
      */
     protected static function getOnlineSession($m){
+        //如果是在gateway环境下
+        if(!empty($_SERVER['GATEWAY_CLIENT_ID'])){
+            return array_filter($m,function($peerId){
+                return Gateway::isUidOnline($peerId);
+            });
+        }
         return RedisService::getInstance()->getPeerIds($m);
     }
 
@@ -182,5 +199,19 @@ abstract class CmdBase{
     static function E($msg){
         echo (colorize($msg."\r\n",'FAILURE'));
         //return false;
+    }
+
+    public static function getIsoDate($date=null) {
+        return array(
+            '__type'=>'Date',
+            'iso' => self::formatDate($date),
+        );
+    }
+    public static function formatDate($date=null) {
+        $utc = new \DateTime($date);
+        $utc->setTimezone(new \DateTimezone("UTC"));
+        $iso = $utc->format("Y-m-d\TH:i:s.u");
+        $iso = substr($iso, 0, 23) . "Z";
+        return $iso;
     }
 }

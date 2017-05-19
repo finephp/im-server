@@ -73,6 +73,9 @@ class HookService{
             if(isset($result['convId'])){
                 $directMsg->setCid($result['convId']);
             }
+            if(isset($result['transient'])){
+                $directMsg->setTransient($result['transient']);
+            }
             if(isset($result['toPeers'])){
                 $directMsg->clearToPeerIds();
                 foreach( $result['toPeers'] as $v) {

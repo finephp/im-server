@@ -123,8 +123,38 @@ class TestController extends Controller {
     }
 
     public function test2(){
-        print_r($_GET);
+        $convModel = Db::MongoModel('Rtm_Conversation');
+        $cid = '58ddbe7089cbbb0007cda0d5';
+        $info  = $convModel->where(array(
+            '_id'=>$cid
+        ))->find($cid);
+        $data = array(
+            'lm' => self::getIsoDate()
+        );
+        $result = $convModel->where(array(
+            '_id'=>$cid
+        ))->save($data);
+        var_dump($result);
+        $info  = $convModel->where(array(
+            '_id'=>$cid
+        ))->find($cid);
+        print_r($info);
     }
+
+    public static function getIsoDate($date=null) {
+        return array(
+            '__type'=>'date',
+            'iso' => self::formatDate($date),
+        );
+    }
+    public static function formatDate($date=null) {
+        $utc = new \DateTime($date);
+        $utc->setTimezone(new \DateTimezone("UTC"));
+        $iso = $utc->format("Y-m-d\TH:i:s.u");
+        $iso = substr($iso, 0, 23) . "Z";
+        return $iso;
+    }
+
 
 
 }

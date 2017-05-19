@@ -51,11 +51,16 @@ class RealtimeRestService{
         $genericCmd->setCmd(CommandType::direct);
         $respMsg = new \DirectCommand();
         $genericCmd->setDirectMessage($respMsg);
-        $msgId = $this->inesrtMessage(array(
-            'convId' => $conv_id,
-            'from' => $from_peer,
-            'data' => $message,
-        ));
+        $msgId = createRandomStr(20);
+        //如果是普通对话，插到会话表
+        if(empty($tr)) {
+            $this->inesrtMessage(array(
+                'convId' => $conv_id,
+                'msgId' => $msgId,
+                'from' => $from_peer,
+                'data' => $message,
+            ));
+        }
         $timestamp = self::getTimestamp(new \MongoDate());
         $genericCmd->setPeerId($from_peer);
         $respMsg->setId($msgId);
@@ -105,26 +110,31 @@ class RealtimeRestService{
         $from_peer = $request['from_peer'];
         $to_peers = $request['to_peers'];
         $message = $request['message'];
-        $tr = $request['transient'];
+        $tr = !empty($request['transient']);
         //查询聊天室
-        $convInfo = $this->_getConversation($conv_id);
+        $convInfo = $this->_getConversationByid($conv_id);
         if(!$convInfo){
             return self::responseError('CONVERSATION_REQUIRED',4313);
         }
         $isSys = !empty($convInfo['sys']);
         $isTr = !empty($convInfo['tr']);
-        if($isTr){
+        if($isSys){
             $tr = true;
+        }
+        $msgId = createRandomStr(20);
+        //如果不是临时会话，就记录到聊天表中
+        if(!$tr){
+            $this->inesrtMessage(array(
+                'convId' => $conv_id,
+                'msgId' => $msgId,
+                'from' => $from_peer,
+                'data' => $message,
+            ));
         }
         $genericCmd = new GenericCommand();
         $genericCmd->setCmd(CommandType::direct);
         $respMsg = new \DirectCommand();
         $genericCmd->setDirectMessage($respMsg);
-        $msgId = $this->inesrtMessage(array(
-            'convId' => $conv_id,
-            'from' => $from_peer,
-            'data' => $message,
-        ));
         $timestamp = self::getTimestamp(new \MongoDate());
         $genericCmd->setPeerId($from_peer);
         $respMsg->setId($msgId);
@@ -209,6 +219,9 @@ class RealtimeRestService{
 
     protected function _getConversationByid($cid)
     {
+        if(empty($cid)){
+            return null;
+        }
         $model = Db::MongoModel('Rtm_Conversation');
         try {
             $result = $model->where(array(
@@ -244,7 +257,7 @@ class RealtimeRestService{
             'convId' => null,
             'from' => null,
             'data' => null,
-            'passed' => false,
+            //'passed' => false,
             'createdAt' => new \MongoDate(),
             'updatedAt' => new \MongoDate(),
         ),$data);
