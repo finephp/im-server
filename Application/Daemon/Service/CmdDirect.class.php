@@ -38,7 +38,7 @@ class CmdDirect extends CmdBase {
         $convData = $this->_getConversation($cid);
         //如果聊天室不存在
         if($convData){
-            $m = $convData['m'] or $m = [];
+            $m = array_unique($convData['m']) or $m = [];
         }
         else{
             $m = [];
@@ -79,9 +79,7 @@ class CmdDirect extends CmdBase {
         echo __METHOD__;
 
         //设置hook
-        $genericCmd->dump();//输出内容1
         HookService::messageReceived($genericCmd);
-        $genericCmd->dump();//输出内容2
         //hook end
 
         $msg_tr = $driectMessage->getTransient();
@@ -125,7 +123,6 @@ class CmdDirect extends CmdBase {
         //以下开始群发消息
         //如果是聊天室的消息，发送到群组之中
         if(!empty($convData['tr'])){
-            //防止用户掉线，强行把用户加到组之中吧 todo
             $this->emitDirectByCid($genericCmd,$msgId);
             return true;
         }
@@ -196,7 +193,7 @@ class CmdDirect extends CmdBase {
             }
             $resp->setPeerId($to);
             G("t1_s");
-            $this->pushClientQueue($resp);
+            $this->pushClientQueue($resp,false);
             G("t1_e");
             $runtime = G('t1_s','t1_e');
             //todo debug

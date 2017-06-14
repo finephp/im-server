@@ -52,6 +52,7 @@ class RealtimeRestService{
         $respMsg = new \DirectCommand();
         $genericCmd->setDirectMessage($respMsg);
         $msgId = createRandomStr(20);
+        $tr = true; // 强制tr为true
         //如果是普通对话，插到会话表
         if(empty($tr)) {
             $this->inesrtMessage(array(

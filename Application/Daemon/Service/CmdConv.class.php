@@ -106,7 +106,7 @@ class CmdConv extends CmdBase {
         if($creater) {
             array_push($m, $creater);
         }
-        array_unique($m);
+        $m = array_unique($m);
         $data = array(
             'm' => $m,
             'c' => $creater,

@@ -75,13 +75,17 @@ abstract class CmdBase{
     }
 
     /**
+     * 在给当前client
      * @param $data GenericCommand|string
-     * @param $client_id string 如果有的话
+     * @param $client_id bool|string 如果有的话
      * @return bool
      */
     protected function pushClientQueue($data,$client_id = null){
-        if(empty($client_id) && !empty($_SERVER['GATEWAY_CLIENT_ID'])){
-            $client_id = $_SERVER['GATEWAY_CLIENT_ID'];
+        //$client_id 如果是 false 那么强制为 uid发送
+        if($client_id !== false) {
+            if (empty($client_id) && !empty($_SERVER['GATEWAY_CLIENT_ID'])) {
+                $client_id = $_SERVER['GATEWAY_CLIENT_ID'];
+            }
         }
         //如果不进redis的话，直接调用gateway发送
         if(defined('ENV_NOREDIS')){
