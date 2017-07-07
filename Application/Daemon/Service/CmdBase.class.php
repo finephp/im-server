@@ -4,6 +4,7 @@ use CommandType;
 use ErrorCommand;
 use GatewayWorker\Lib\Gateway;
 use GenericCommand;
+
 if(!IS_CLI){
     die('NOT CLI');
 }
@@ -80,7 +81,7 @@ abstract class CmdBase{
      * @param $client_id bool|string 如果有的话
      * @return bool
      */
-    protected function pushClientQueue($data,$client_id = null){
+    public function pushClientQueue($data,$client_id = null){
         //$client_id 如果是 false 那么强制为 uid发送
         if($client_id !== false) {
             if (empty($client_id) && !empty($_SERVER['GATEWAY_CLIENT_ID'])) {
@@ -117,7 +118,7 @@ abstract class CmdBase{
      * @param $exclude_peerid array
      * @return bool
      */
-    protected function pushGroupQueue($dataRes,$cid,$exclude_peerid = null){
+    public function pushGroupQueue($dataRes,$cid,$exclude_peerid = null){
         $data = $this->encodeResp($dataRes);
         if($exclude_peerid) {
             //$exclude_client_id = Gateway::getClientIdByUid($exclude_peerid);
@@ -217,5 +218,9 @@ abstract class CmdBase{
         $iso = $utc->format("Y-m-d\TH:i:s.u");
         $iso = substr($iso, 0, 23) . "Z";
         return $iso;
+    }
+
+    protected static function sign($text,$key){
+        return hash_hmac('sha1',$text,$key);
     }
 }

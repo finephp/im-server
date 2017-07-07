@@ -50,6 +50,11 @@ class CmdSession extends CmdBase {
         $fromPearId = $genericCmd->getPeerId() or $fromPearId = "guest_" . md5(time() . mt_rand(1, 10));
         //登录session
         $sessionMessage = $genericCmd->getSessionMessage();
+        //开始签名校验
+        if(C('SIGNATURE_FLAG') && $resp = $this->checkSignature($genericCmd)){
+            $this->pushClientQueue($resp);
+        }
+        //结束签名校验
         if ($sessionMessage) {
             //retry SESSION TOKEN
             $st = $sessionMessage->getSt(); //session token
@@ -184,5 +189,41 @@ class CmdSession extends CmdBase {
         $respUnread->setAppId($genericCmd->getAppId());
         $respUnread->setUnreadMessage($unreadMessage);
         $this->pushClientQueue($respUnread);
+    }
+
+    /**
+    /* 校验签名
+     * appid:clientid::timestamp:nonce
+     * @param $genericCmd GenericCommand
+     * @param $sign String
+     * @return bool|GenericCommand
+     */
+    protected function checkSignature($genericCmd){
+        $msg = $genericCmd->getSessionMessage();
+        //如果是重连，先跳过吧,以后再处理,不然签名无法保存 todo
+        if($msg->getR()){
+            return false;
+        }
+        $text = $genericCmd->getAppId().
+            ':'.$genericCmd->getPeerId().
+            '::'.$msg->getT().
+            ':'.$msg->getN();
+        $sign = $msg->getS();
+        $servSign = self::sign($text,C('MC_APP_MASTERKEY'));
+        if($sign && $sign === $servSign){
+            return false;
+        }
+        echo colorize(print_r(array(
+                    __METHOD__=>'SIGNATURE_FAILED',
+                    'text'=> $text,
+                    'sign'=>$sign,
+                    'servSign'=>$servSign
+                ),true)
+                ,'FAILURE')."\r\n";
+        $resp = $this->respError(4102,'SIGNATURE_FAILED');
+        $resp->setI($genericCmd->getI());
+        $resp->setPeerId($genericCmd->getPeerId());
+        $resp->setAppId($genericCmd->getAppId());
+        return $resp;
     }
 }

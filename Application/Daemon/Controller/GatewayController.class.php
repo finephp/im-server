@@ -69,7 +69,7 @@ class GatewayController extends Controller {
     }
 
     /**
-     * todo gateway 服务
+     * gateway 服务
      */
     public function gatewayWorker(){
         Autoloader::setRootPath(__DIR__);
@@ -80,10 +80,10 @@ class GatewayController extends Controller {
         // 设置进程数，gateway进程数建议与cpu核数相同
         $gateway->count = C('APP_WORKER_COUNT');
         // 分布式部署时请设置成内网ip（非127.0.0.1）
-        $gateway->lanIp = '127.0.0.1';
+        $gateway->lanIp = C('GATEWAY_LANIP');
         // 内部通讯起始端口，假如$gateway->count=4，起始端口为4000
         // 则一般会使用4000 4001 4002 4003 4个端口作为内部通讯端口
-        $gateway->startPort = 2300;
+        $gateway->startPort = C('GATEWAY_START_PORT');
         // 心跳间隔
         $gateway->pingInterval = 10;
         // 心跳数据

@@ -39,6 +39,11 @@ class CmdConv extends CmdBase {
     static function exeCmd($genericCmd){
         $cmd = new self($genericCmd);
         $opType = $genericCmd->getOp();
+        //开始签名校验
+        if(C('SIGNATURE_FLAG') && $resp = $cmd->checkConvSignature($genericCmd)){
+            return $cmd->pushClientQueue($resp);
+        }
+        //结束签名校验
         switch($opType){
             case OpType::add:// add = 2
                 return $cmd->opAdd($genericCmd);
@@ -750,5 +755,68 @@ class CmdConv extends CmdBase {
                 '_id' => $info['_id']
             ))->save($data);
         }
+    }
+
+    /**
+     * 校验会话签名
+     * appid:clientid:sorted_member_ids:timestamp:nonce 创建会话
+     * appid:clientid:convid:sorted_member_ids:timestamp:nonce:action 操作
+     * @param $genericCmd GenericCommand
+     * @param $sign String
+     * @return bool|GenericCommand
+     */
+    public function checkConvSignature($genericCmd){
+        $msg = $genericCmd->getConvMessage();
+        $op = $genericCmd->getOp();
+        $action = dict_value($op,array(
+            \OpType::start => 'start',
+            \OpType::add => 'invite',
+            \OpType::join => 'invite',
+            \OpType::update => 'invite',
+            \OpType::remove => 'kick',
+        ),'');
+        if(!$action){
+            return false;
+        }
+        $members = $msg->getM();
+        $sorted_member_ids = '';
+        if($members) {
+            sort($members);
+            $sorted_member_ids = implode(':', $members);
+        }
+        $app_id = C('MC_APP_ID');
+        if($op == \OpType::start) {
+            $text = $app_id .
+                ':' . $genericCmd->getPeerId() .
+                ':' . $sorted_member_ids .
+                ':' . $msg->getT().
+                ':' . $msg->getN();
+        }
+        else{
+            $text = $app_id .
+                ':' . $genericCmd->getPeerId() .
+                ':' . $sorted_member_ids .
+                ':' . $msg->getT().
+                ':' . $msg->getN().
+                ':'. $action;
+        }
+        $sign = $msg->getS();
+        $servSign = self::sign($text,C('MC_APP_MASTERKEY'));
+        if($sign && $sign === $servSign){
+            return false;
+        }
+        echo colorize(print_r(array(
+                    __METHOD__=>'SIGNATURE_FAILED',
+                    'text'=> $text,
+                    'sign'=>$sign,
+                    'servSign'=>$servSign
+                ),true)
+                ,'FAILURE')."\r\n";
+
+        $resp = $this->respError(4102,'SIGNATURE_FAILED');
+        $resp->setI($genericCmd->getI());
+        $resp->setPeerId($genericCmd->getPeerId());
+        $resp->setAppId($genericCmd->getAppId());
+        return $resp;
     }
 }

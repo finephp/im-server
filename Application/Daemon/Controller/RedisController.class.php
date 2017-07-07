@@ -56,7 +56,7 @@ class RedisController extends Controller {
                     }
                 }
                 else{
-                    usleep(200*1000);//休息100 豪秒
+                    usleep(200*1000);//休息200 豪秒
                 }
             }
 

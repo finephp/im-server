@@ -181,13 +181,20 @@ class RealtimeRestService{
             echo ('config.RTM_SOCKET_URL undefined');
             return false;
         }
-        var_dump(C('RTM_SOCKET_URL'));
-        $client = stream_socket_client('tcp://'.C('RTM_SOCKET_URL'), $errno, $errmsg, 1);
-        $result = fwrite($client, $this->frameEncode($message));
         var_dump(__METHOD__);
+        var_dump(C('RTM_SOCKET_URL'));
+        $client_fp = stream_socket_client('tcp://'.C('RTM_SOCKET_URL'), $errno, $errmsg, 1);
+        if(!$client_fp){
+            return false;
+        }
+        $result = fwrite($client_fp, $this->frameEncode($message));
         var_dump($result);
-        unset($client);
-        return $result;
+        //开始读取返回结果
+        $response =  fread($client_fp, 1024);
+        fclose($client_fp);
+        var_dump($response);
+        unset($client_fp);
+        return $response;
     }
 
     /**

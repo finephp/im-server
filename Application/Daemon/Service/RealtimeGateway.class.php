@@ -186,6 +186,11 @@ class RealtimeGateway {
         Gateway::sendToClient($connection->id,$this->encodeResp($data,$session));
     }
 
+    /**
+     * 提交到redis中处理数据
+     * @param $data
+     * @param string $queue
+     */
     public function pushServerQueue($data,$queue = ''){
         echo 'pushServerQueue:'."\r\n";
         $data = $this->encodeResp($data);
@@ -330,6 +335,7 @@ class RealtimeGateway {
      *
      */
     static function handleCmdMessage($message){
+        print_r($message);
         $message = json_decode($message,true);
         $data = $message['data'];
         $cmd = $message['cmd'];
