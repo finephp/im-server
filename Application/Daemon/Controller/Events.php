@@ -62,15 +62,16 @@ class Events
      */
     public static function onWorkerStart($businessWorker)
     {
-        echo "EventStart {$businessWorker->id} \n";
         //注册事件
         if($businessWorker->id === 0){
+            //+cleanClient
             \Daemon\Service\RealtimeGateway::clearClients();
             //添加定时器,清除 redis 中无效 clients
             \Daemon\Service\RealtimeGateway::clearClients();
             \Workerman\Lib\Timer::add(60,function(){
                 \Daemon\Service\RealtimeGateway::clearClients();
             });
+            //-cleanClient
 
             $innerWokerIp = 'frame://0.0.0.0:2208';
             //再定义一个内部消息通知接口

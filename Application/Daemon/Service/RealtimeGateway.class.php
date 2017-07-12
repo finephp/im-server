@@ -335,7 +335,6 @@ class RealtimeGateway {
      *
      */
     static function handleCmdMessage($message){
-        print_r($message);
         $message = json_decode($message,true);
         $data = $message['data'];
         $cmd = $message['cmd'];

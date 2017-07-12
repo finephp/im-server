@@ -1,0 +1,33 @@
+version: '2'
+services: 
+  im_queue:
+      image: wangtr/php_swoole
+      env_file: app.env
+      volumes:
+          - ./php:/root/php/:ro
+          - ./php_framework:/php_framework:ro
+      command: sh /root/php/start-queue.sh
+  im_websocket:
+      image: wangtr/php_swoole
+      env_file: app.env
+      volumes:
+          - ./php:/root/php/:ro
+          - ./php_framework:/php_framework:ro
+      ports:
+          - 8585:8585
+          - 4000:4000
+          - 4001:4001
+          - 4002:4002
+          - 4003:4003
+      command: sh /root/php/start-websocket.sh
+  im_restful:
+      image: wangtr/php_swoole
+      env_file: app.env
+      volumes:
+          - ./php:/root/php/:ro
+          - ./php_framework:/php_framework:ro
+      links:
+          - im_websocket:im_server
+      ports:
+          - 8581:8081
+      command: sh /root/php/start-restful.sh
