@@ -6,6 +6,6 @@ git archive -o ./build/php.tar master
 #tar xf ./build/php.tar -C ./build/php
 cp Dockerfile ./build/
 cd build
-docker build --no-cache=false -f Dockerfile -t wangtr/im_realtime
+docker build --no-cache=false -f Dockerfile -t wangtr/im_realtime .
 cd ..
 rm -rf build
