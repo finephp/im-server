@@ -152,8 +152,6 @@ class CmdConv extends CmdBase {
         }
         //如果是暂态会话
         if($tr){
-           print_r($_SERVER);
-
         }
         else {
             //更新会话成员信息
@@ -521,8 +519,6 @@ class CmdConv extends CmdBase {
         $model = $this->_getConvModel();
         //获取聊天室信息
         $convInfo = $this->_getConversation($cid);
-        print_r(__METHOD__);
-        print_r($convInfo);
         //判断聊天室是否暂态聊天室
         //如果是暂态聊天室，把用户加到 gateway的聊天组
         if(!empty($convInfo['tr'])){

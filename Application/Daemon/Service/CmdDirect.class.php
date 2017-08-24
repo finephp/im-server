@@ -76,13 +76,10 @@ class CmdDirect extends CmdBase {
         $ackMsg->setUid($msgId);
         $resp->setAckMessage($ackMsg);
         $this->pushClientQueue($resp);
-        echo __METHOD__;
-
         //设置hook
         HookService::messageReceived($genericCmd);
         //hook end
-
-        $msg_tr = $driectMessage->getTransient();
+        $msg_tr = $convData['tr'] || $driectMessage->getTransient();
         //如果cid被清空，则直接返回，
         if(empty($driectMessage->getCid())){
             return true;
@@ -126,9 +123,11 @@ class CmdDirect extends CmdBase {
             $this->emitDirectByCid($genericCmd,$msgId);
             return true;
         }
+        G('t1_start');
         //查询在线的人
         $m = self::getOnlineSession($m);
-        G('time_1_s');
+        echo colorize(__METHOD__.' getOnlineSession runtime:'.G('t1_start','t1_end'),'NOTE')."\r\n";
+        G('t1_end');
         $this->sendDirect($genericCmd,$m,$msgId);
         /* 改成不要插到 这张表
         //插入到对话中的所有成员的记录
@@ -223,6 +222,7 @@ class CmdDirect extends CmdBase {
         $respMsg->setMsg($directMessage->getMsg());
         $respMsg->setTransient($directMessage->getTransient());
         $this->pushGroupQueue($resp,$directMessage->getCid(),$peerId);
+        echo __METHOD__."\r\n";
     }
 
     protected function _getMessageModel()
