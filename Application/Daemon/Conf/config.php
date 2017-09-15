@@ -28,4 +28,5 @@ getenv('MC_APP_ID') && $config['MC_APP_ID'] = getenv('MC_APP_ID');
 if(C('DEVEL_API_CONF')){
     $config = array_merge($config,C('DEVEL_API_CONF'));
 }
+define('IM_DEBUG',getenv('IM_DEBUG')=='1'?true:false);
 return $config;

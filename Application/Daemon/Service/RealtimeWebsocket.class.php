@@ -87,14 +87,11 @@ class RealtimeWebsocket {
         $appId = $genericCmd->getAppId();
         $cmd = $genericCmd->getCmd();
 
-        //记录日志 ,只记录 14 的
-        if($cmd != 14) {
-            ob_start();
+        //记录日志 ,只记录 非 14 的
+        if(IM_DEBUG && $cmd != 14) {
             echo "connection id[" . $connection->id . "]:in:";
             $genericCmd->dump();
-            $in_str = ob_get_clean();
-            log_write($in_str);
-            echo $in_str . "\r\n";
+            echo "\r\n";
             //结束日志
         }
         $other = array(
@@ -201,7 +198,7 @@ class RealtimeWebsocket {
         try {
             $genericCmd->parseFromString($result);
         } catch (\Exception $e) {
-            echo 'Parse error: ' . $e->getMessage();
+            echo __METHOD__, ' Parse error: ' . $e->getMessage();
             var_dump(base64_encode($result));
             return false;
         }

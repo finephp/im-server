@@ -44,7 +44,7 @@ class CmdDirect extends CmdBase {
             $m = [];
         }
         G('t1_end');
-        echo colorize(__METHOD__.' getConv runtime:'.G('t1_start','t1_end'),'NOTE')."\r\n";
+        //echo colorize(__METHOD__.' getConv runtime:'.G('t1_start','t1_end'),'NOTE')."\r\n";
         //查询是否暂态对话或者临时聊天室
         //查看peerid是否在对话之中,否则返回错误
         if(empty($convData)
@@ -120,14 +120,15 @@ class CmdDirect extends CmdBase {
         //以下开始群发消息
         //如果是聊天室的消息，发送到群组之中
         if(!empty($convData['tr'])){
-            $this->emitDirectByCid($genericCmd,$msgId);
+            $client_id = !empty($_SERVER['GATEWAY_CLIENT_ID'])?$_SERVER['GATEWAY_CLIENT_ID']:null;
+            $this->emitDirectByCid($genericCmd,$msgId,$client_id);
             return true;
         }
         G('t1_start');
         //查询在线的人
         $m = self::getOnlineSession($m);
-        echo colorize(__METHOD__.' getOnlineSession runtime:'.G('t1_start','t1_end'),'NOTE')."\r\n";
         G('t1_end');
+        echo colorize(__METHOD__.' getOnlineSession runtime:'.G('t1_start','t1_end'),'NOTE')."\r\n";
         $this->sendDirect($genericCmd,$m,$msgId);
         /* 改成不要插到 这张表
         //插入到对话中的所有成员的记录
@@ -186,11 +187,12 @@ class CmdDirect extends CmdBase {
         $respMsg->setTransient($directMessage->getTransient());
         $i=0;
         foreach($m as $to) {
+            $resp->setPeerId($to);
             //不要发给自已当前的client
             if($to == $peerId){
-                //continue;
+                $this->pushPeerIdClient($resp,$peerId,$_SERVER['GATEWAY_CLIENT_ID']);
+                continue;
             }
-            $resp->setPeerId($to);
             G("t1_s");
             $this->pushClientQueue($resp,false);
             G("t1_e");
@@ -207,8 +209,9 @@ class CmdDirect extends CmdBase {
      * 发送到群组中
      * @param $genericCmd GenericCommand
      * @param $msgId String
+     * @param $exclude_client_id
      */
-    public function emitDirectByCid($genericCmd,$msgId){
+    public function emitDirectByCid($genericCmd,$msgId,$exclude_client_id=null){
         $peerId = $genericCmd->getPeerId();
         $directMessage = $genericCmd->getDirectMessage();
         $resp = new GenericCommand();
@@ -221,8 +224,7 @@ class CmdDirect extends CmdBase {
         $respMsg->setCid($directMessage->getCid());
         $respMsg->setMsg($directMessage->getMsg());
         $respMsg->setTransient($directMessage->getTransient());
-        $this->pushGroupQueue($resp,$directMessage->getCid(),$peerId);
-        echo __METHOD__."\r\n";
+        $this->pushGroupQueue($resp,$directMessage->getCid(),$exclude_client_id);
     }
 
     protected function _getMessageModel()

@@ -158,7 +158,7 @@ class RealtimeRestService{
         //如果是系统对话
         elseif($isSys){
             $genericCmd->setPeerId($conv_id);//这儿的peerId变成了组id，免得再次解析
-            $this->sendToRtm('MESSAGE_RROAD:'.$this->encodeResp($genericCmd));
+            $this->sendToRtm('MESSAGE_GROUP:'.$this->encodeResp($genericCmd));
         }
         //否则是暂态对话，发到对话组中
         elseif($isTr){
@@ -176,7 +176,7 @@ class RealtimeRestService{
      * @param $message
      * @return bool|int
      */
-    public function sendToRtm($message){
+    public function sendToRtm($message,$resp=false){
         if(!C('RTM_SOCKET_URL')){
             echo ('config.RTM_SOCKET_URL undefined');
             return false;
@@ -190,11 +190,13 @@ class RealtimeRestService{
         $result = fwrite($client_fp, $this->frameEncode($message));
         var_dump($result);
         //开始读取返回结果
-        $response =  fread($client_fp, 1024);
+        if($resp) {
+            $response = fread($client_fp, 1024);
+            var_dump($response);
+        }
         fclose($client_fp);
-        var_dump($response);
         unset($client_fp);
-        return $response;
+        return "";
     }
 
     /**

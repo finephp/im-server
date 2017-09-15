@@ -68,8 +68,14 @@ class RealtimeGatewayClients{
         }
         $count = 0;
         foreach($user as $peerId){
-            $connections = self::getClientId($peerId);
-            self::sendByClients($connections,$msg);
+            //如果是在GateWay环境下，那么直接发送
+            if(true) {
+                Gateway::sendToUid($peerId, $msg);
+            }
+            else {
+                $connections = self::getClientId($peerId);
+                self::sendByClients($connections, $msg);
+            }
             $count++;
         }
         return $count;

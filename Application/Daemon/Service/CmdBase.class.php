@@ -112,21 +112,33 @@ abstract class CmdBase{
     }
 
     /**
+     * 发给当前的peerId的客户端
+     * @param $data
+     * @param $peerId
+     * @param $exclude_client_id string 要排除的client_id
+     * @return void
+     */
+    public function pushPeerIdClient($data,$peerId,$exclude_client_id = null){
+        $clients = Gateway::getClientIdByUid($peerId);
+        if(!$clients){
+            return;
+        }
+        foreach($clients as $v){
+            if(!$exclude_client_id || $v != $exclude_client_id){
+                Gateway::sendToClient($v, $this->encodeResp($data,$_SESSION));
+            }
+        }
+    }
+
+    /**
      * 按照组群发
      * @param $dataRes GenericCommand
      * @param $cid string
-     * @param $exclude_peerid array
+     * @param $exclude_client_id
      * @return bool
      */
-    public function pushGroupQueue($dataRes,$cid,$exclude_peerid = null){
+    public function pushGroupQueue($dataRes,$cid,$exclude_client_id = null){
         $data = $this->encodeResp($dataRes);
-        if($exclude_peerid) {
-            //$exclude_client_id = Gateway::getClientIdByUid($exclude_peerid);
-            $exclude_client_id = null;
-        }
-        else{
-            $exclude_client_id = null;
-        }
         /*echo __METHOD__.print_r(
             array(
                 'cid' => $cid,

@@ -118,17 +118,18 @@ class RealtimeGateway {
             $cmd == 14
             //查询人数的不要记 1 , 43
             || ($cmd == CommandType::conv && $genericCmd->getOp() == OpType::count)
+            || !IM_DEBUG
         ){
 
         }
         //以下要记录日志
         else {
-            echo "connection id[" . $connection->id . "]:in:";
-            ob_start();
-            $genericCmd->dump();
-            $in_str = ob_get_clean();
-            //log_write($in_str);
-            echo $in_str . "\r\n";
+                echo "connection id[" . $connection->id . "]:in:";
+                ob_start();
+                $genericCmd->dump();
+                $in_str = ob_get_clean();
+                //log_write($in_str);
+                echo $in_str . "\r\n";
         }
 
         $this->connection = $connection;
