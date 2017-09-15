@@ -1,6 +1,7 @@
 rm -rf build
 mkdir build
 git checkout master
+git pull
 git archive -o ./build/php.tar master
 #mkdir build/php
 #tar xf ./build/php.tar -C ./build/php
