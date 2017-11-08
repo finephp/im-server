@@ -121,6 +121,7 @@ class CmdDirect extends CmdBase {
         //如果是聊天室的消息，发送到群组之中
         if(!empty($convData['tr'])){
             $client_id = !empty($_SERVER['GATEWAY_CLIENT_ID'])?$_SERVER['GATEWAY_CLIENT_ID']:null;
+            $client_id = null;//todo debug
             $this->emitDirectByCid($genericCmd,$msgId,$client_id);
             return true;
         }
