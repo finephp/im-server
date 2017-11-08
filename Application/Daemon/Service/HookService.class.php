@@ -11,7 +11,8 @@ class HookService{
     {
         //如果没有设置云函数地址，则直接返回
         $cloudUrl = C('CLOUD_URL');
-        if(empty($cloudUrl)){
+        $hooks = C('HOOK_URLS');
+        if(empty($cloudUrl) && empty($hooks)){
             return;
         }
         // request.params = {
@@ -29,6 +30,25 @@ class HookService{
         //     timestamp: 1472200796764
         // };
         $directMsg = $genericCmd->getDirectMessage();
+        //解析 hooks
+        if($hooks){
+            //解析消息内容
+            $content = json_decode($directMsg->getMsg(),true);
+            $attrs = $content['_lcattrs'];
+            if($attrs) {
+                $hook_name = !empty($attrs['_hook']) ? $attrs['_hook'] : '';
+                if (!empty($hooks[$hook_name])) {
+                    $cloudUrl = $hooks[$hook_name];
+                }
+            }
+        }
+        if(IM_DEBUG) {
+            print_r($hooks);
+            print_r($cloudUrl);
+        }
+        if(empty($cloudUrl)){
+            return;
+        }
         $params = array(
             'fromPeer' => $genericCmd->getPeerId(),
             'receipt' => $directMsg->getR(),
@@ -46,6 +66,7 @@ class HookService{
         $url = $cloudUrl.'/messageReceived';
         self::log(__METHOD__);
         self::log(json_encode($params));
+        G('t_start');
         $result = curl_request($url,json_encode($params),$error,array(
             'HEADERS'=>array(
                 //'Authorization: JWT eyJ0eXAiOiJKV1QiLCJhUzI1NiJDIxL',
@@ -54,8 +75,11 @@ class HookService{
             'METHOD' => 'POST',
 
         ));
-        self::log($url,$result);
-        self::log($error);
+        G('t_end');
+        self::log('request:'.$url.' runtime:'.G('t_start','t_end'),$result);
+        if($error) {
+            self::log($error);
+        }
         if(empty($result)){
             return;
         }

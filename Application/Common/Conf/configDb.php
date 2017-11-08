@@ -43,4 +43,16 @@ if(getenv('DB_NAME')){
 if(getenv('CLOUD_URL')){
     $config['CLOUD_URL'] = getenv('CLOUD_URL');
 }
+//环境变量hook名称列表
+if(getenv(('HOOK_NAMES'))){
+    //cjs,dxt
+    $config['HOOK_NAMES'] = getenv('HOOK_NAMES');
+    $arr = explode(',',$config['HOOK_NAMES']);
+    $config['HOOK_URLS'] = array();
+    foreach($arr as $k=>$v){
+        if(getenv('HOOK_URL_'.$k)){
+            $config['HOOK_URLS'][$v] = getenv('HOOK_URL_'.$k);
+        }
+    }
+}
 return $config;
