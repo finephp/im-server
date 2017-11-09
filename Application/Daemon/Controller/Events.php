@@ -85,21 +85,21 @@ class Events
                 if(strpos($message,'MESSAGE_BROAD:') === 0){
                     $message = substr($message,14);
                     $result = \Daemon\Service\RealtimeGateway::handleBroadMessage($message);
-                    $connection->send($result||"");
+                    $connection->send($result ? $result : '');
                     return;
                 }
                 //查看是否发到聊天室中
                 elseif(strpos($message,'MESSAGE_GROUP:') === 0){
                     $message = substr($message,14);
                     $result = \Daemon\Service\RealtimeGateway::handleGroupMessage($message);
-                    $connection->send($result||"");
+                    $connection->send($result ? $result : '');
                     return;
                 }
                 //其它命令
                 elseif(strpos($message,'CMD:') === 0){
                     $message = substr($message,4);
                     $result = \Daemon\Service\RealtimeGateway::handleCmdMessage($message);
-                    $connection->send($result||"");
+                    $connection->send($result ? $result : '');
                     return;
                 }
                 echo "__________on:genericCmd:"."\n";
