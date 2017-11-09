@@ -194,9 +194,12 @@ class RealtimeRestService{
             $response = fread($client_fp, 1024);
             var_dump($response);
         }
+        else {
+            $response = '';
+        }
         fclose($client_fp);
         unset($client_fp);
-        return "";
+        return $response;
     }
 
     /**
@@ -281,7 +284,7 @@ class RealtimeRestService{
             'cmd' => 'transient_group/onlines',
             'data' => $request,
         );
-        $result = $this->sendToRtm('CMD:'.json_encode($cmd));
+        $result = $this->sendToRtm('CMD:'.json_encode($cmd),true);
         return $result;
     }
 
@@ -291,7 +294,7 @@ class RealtimeRestService{
             'cmd' => 'online',
             'data' => $request,
         );
-        $result = $this->sendToRtm('CMD:'.json_encode($cmd));
+        $result = $this->sendToRtm('CMD:'.json_encode($cmd),true);
         return $result;
     }
 
