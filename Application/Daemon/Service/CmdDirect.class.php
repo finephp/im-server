@@ -79,7 +79,8 @@ class CmdDirect extends CmdBase {
         //设置hook
         HookService::messageReceived($genericCmd);
         //hook end
-        $msg_tr = $convData['tr'] || $driectMessage->getTransient();
+        //$msg_tr = $convData['tr'] || $driectMessage->getTransient(); //todo 暂态聊天室其实不保留记录
+        $msg_tr = $driectMessage->getTransient();
         //如果cid被清空，则直接返回，
         if(empty($driectMessage->getCid())){
             return true;
