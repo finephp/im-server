@@ -72,6 +72,15 @@ class CmdLogs extends CmdBase {
         $limit = $recLogsMessage->getL();
         $t = $recLogsMessage->getT();//before Time
         $tt = $recLogsMessage->getTt();//after time
+
+        echo __METHOD__.":";
+        if($t){
+            echo ' t:'.$t.'  '.date('Y-m-d H:i:s',floor($t/1000));
+        }
+        if($tt){
+            echo ' tt:'.$tt.'  '.date('Y-m-d H:i:s',floor($tt/1000));
+        }
+        $genericCmd->dump();
         if($limit === 0){
             return array();
         }
@@ -92,15 +101,17 @@ class CmdLogs extends CmdBase {
         $model = $this->_getMessageLogsModel();
         $result = $model->where($where)->limit($limit)->order("createdAt desc")
             ->select() or $result = array();
+        $result = array_reverse($result);
+        return $result;
         //对结果按时间倒序
-        $new_result = array();
+        /*$new_result = array();
         foreach($result as $v){
             $new_result[$v['createdAt']->sec.$v['createdAt']->usec.$v['msgId']] = $v;
         }
         ksort($new_result);
         $new_result = array_values($new_result);
         log_write($model->_sql(),__METHOD__);
-        return $new_result;
+        //return $new_result;*/
     }
 
     protected function _getMessageLogsModel(){
