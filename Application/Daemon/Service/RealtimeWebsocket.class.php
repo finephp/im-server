@@ -27,9 +27,9 @@ class RealtimeWebsocket {
     static function handleMessage($connection,$data,$ws_worker){
         $_SESSION['connection'] = $connection;
         $noBinary = isset($connection->SecWebSocketProtocol) && $connection->SecWebSocketProtocol=='lc.protobase64.3';
-        var_dump($connection->SecWebSocketProtocol);
         if($noBinary){
             $packed = base64_decode($data);
+            $connection->websocketType = \Workerman\Protocols\Websocket::BINARY_TYPE_BLOB;
         }
         else{
             //设置为 BINARY_TYPE_ARRAYBUFFER 格式

@@ -73,21 +73,23 @@ class RealtimeGateway {
         unset($respstr);
         */
         //echo __METHOD__,print_r($session,true);
+         $noBinary = false;
         if($session){
             //if(strpos($session['ua'],'js/2.')===0){
             if(empty($session['SecWebSocketProtocol'])){
                 $new_resp = V2Transfer::transCmdOut($resp);
                 return $new_resp;
             }
+            if($session['SecWebSocketProtocol']== 'lc.protobase64.3'){
+                $noBinary = true;
+            }
         }
         $new_resp = $resp->serializeToString();
         //这个地方要注意 todo 可能在web版中会有问题
         //$new_resp .= pack('H*','EA0600');
-        /*
-        if($this->noBinary) {
+        if($noBinary) {
             $new_resp = base64_encode($new_resp);
         }
-        */
         return $new_resp;
     }
 
