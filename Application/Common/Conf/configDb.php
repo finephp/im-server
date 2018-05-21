@@ -45,6 +45,11 @@ if(getenv('DB_PWD')){
 }
 
 //设置环境变量
+if(getenv('DB_USER')){
+    $config['DB_CONFIG_MONGO']['DB_USER'] = getenv('DB_USER');
+}
+
+//设置环境变量
 if(getenv('DB_DSN')){
     //mongodb://10.30.0.23:37017,10.30.0.23:47017
     $config['DB_CONFIG_MONGO']['DB_DSN'] = getenv('DB_DSN');
