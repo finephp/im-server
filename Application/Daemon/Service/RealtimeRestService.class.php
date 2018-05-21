@@ -385,6 +385,9 @@ class RealtimeRestService{
             $where['name'] = $whereData['name'];
         }
         $model = Db::MongoModel('Rtm_Conversation');
+        if(!$model){
+            return 'system error';
+        }
         $model->limit(10);
         try {
             $result = $model->field('name,objectId')->where($where)->select()
