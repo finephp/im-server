@@ -39,6 +39,18 @@ if(getenv('DB_NAME')){
     $config['DB_CONFIG_MONGO']['DB_NAME'] = getenv('DB_NAME');
 }
 
+//设置环境变量
+if(getenv('DB_PWD')){
+    $config['DB_CONFIG_MONGO']['DB_PWD'] = getenv('DB_PWD');
+}
+
+//设置环境变量
+if(getenv('DB_DSN')){
+    //mongodb://10.30.0.23:37017,10.30.0.23:47017
+    $config['DB_CONFIG_MONGO']['DB_DSN'] = getenv('DB_DSN');
+}
+
+
 //环境变量云函数地址
 if(getenv('CLOUD_URL')){
     $config['CLOUD_URL'] = getenv('CLOUD_URL');
