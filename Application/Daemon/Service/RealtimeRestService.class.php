@@ -404,7 +404,12 @@ class RealtimeRestService{
             ));
             return $result;
         }catch(\Exception $e){
-            return null;
+            $result = json_encode(array(
+                'code'=>-1,
+                'data'=>'system error',
+            ));
+            E($e->getMessage());
+            return $result;
         }
     }
 }

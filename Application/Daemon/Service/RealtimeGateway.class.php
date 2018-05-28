@@ -195,7 +195,7 @@ class RealtimeGateway {
      * @param string $queue
      */
     public function pushServerQueue($data,$queue = ''){
-        echo 'pushServerQueue:'."\r\n";
+        //echo 'pushServerQueue:'."\r\n";
         $data = $this->encodeResp($data);
         //todo debug
         if(defined('ENV_NOREDIS')) {
