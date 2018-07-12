@@ -31,6 +31,10 @@ class CmdDirect extends CmdBase {
      */
     public function directCommand($genericCmd,$other){
         $peerId = $genericCmd->getPeerId();
+        if(empty($peerId)){
+            $peerId = $_SESSION['peerId'];
+            $genericCmd->setPeerId($peerId);
+        }
         //注册用户
         G('t1_start');
         $driectMessage = $genericCmd->getDirectMessage();
@@ -55,7 +59,7 @@ class CmdDirect extends CmdBase {
             $resp = new GenericCommand();
             $resp->setCmd(CommandType::ack);
             $resp->setI($genericCmd->getI());
-            $resp->setPeerId($genericCmd->getPeerId());
+            $resp->setPeerId($peerId);
             $ackMsg = new AckCommand();
             $ackMsg->setCode(4401);
             $ackMsg->setReason('INVALID_MESSAGING_TARGET');
