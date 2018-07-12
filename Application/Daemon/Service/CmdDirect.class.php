@@ -32,6 +32,7 @@ class CmdDirect extends CmdBase {
     public function directCommand($genericCmd,$other){
         $peerId = $genericCmd->getPeerId();
         if(empty($peerId)){
+            //4.6.2 修正 by tr
             $peerId = $_SESSION['peerId'];
             $genericCmd->setPeerId($peerId);
         }
