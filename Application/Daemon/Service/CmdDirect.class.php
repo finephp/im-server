@@ -61,6 +61,8 @@ class CmdDirect extends CmdBase {
             $ackMsg->setReason('INVALID_MESSAGING_TARGET');
             $ackMsg->setT(time()*1000);
             $resp->setAckMessage($ackMsg);
+            echo 'INVALID_MESSAGING_TARGET';
+            $genericCmd->dump();
             return $this->pushClientQueue($resp);
         }
         //判断是否暂态消息

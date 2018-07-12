@@ -17,6 +17,5 @@
  IM_SOCKET_HOST=imserver #restful 内部通知地址  
  IM_SOCKET_PORT=2208 # restful 内部通知端口
  
-  
  
  
