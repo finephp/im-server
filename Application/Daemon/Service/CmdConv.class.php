@@ -122,6 +122,19 @@ class CmdConv extends CmdBase {
         $data = $model->create($data);
         //查询是否有维一的成员组的聊天室
         $unique = $convMessage->getUnique();
+        //如果是暂态聊天室，且唯一，则只按名称查询
+        if($tr && $unique){
+            $resultConv = $model->where(array(
+                'unique' => true,
+                'tr' => true, //暂态聊天室
+                'name' => $data['name']
+                //'c'=>$creater,
+            ))->find();
+            if($resultConv){
+                $cid = $resultConv['_id'];
+                $m = $resultConv['m'];
+            }
+        }
         if(!$tr && $unique){
             $resultConv = $model->where(array(
                 'unique'=>true,

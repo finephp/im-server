@@ -30,4 +30,19 @@ class ConversationController extends BaseController {
         return $service->queryConversation($_GET);
     }
 
+    /**
+     */
+    public function create_chatrooms(){
+        $input = RealtimeRestService::parseInputData();
+        $data = array(
+            'm' => [],
+            'c' => empty($input['create'])?:'',
+            'name' => empty($input['name'])?:'',
+            'unique' => !empty($input['unique']),
+            'tr'=> !empty($input['tr']),
+        );
+        $data = array_merge($input,$data);
+
+    }
+
 }

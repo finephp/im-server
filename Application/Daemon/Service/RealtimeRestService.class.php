@@ -412,5 +412,50 @@ class RealtimeRestService{
             return $result;
         }
     }
+
+    //创建会话
+    public function createConv($data){
+        //插入聊天表
+        $convModel = Db::MongoModel('Rtm_Conversation');
+        //如果是暂态聊天室，且按名称唯一，查查询是否已经存在
+        if($data['tr'] && $data['unique']){
+            $resultConv = $convModel->where(array(
+                'name' => $data['name']
+            ))->field('name,objectId,createdAt')->find();
+            if($resultConv){
+                return json_encode(array(
+                    'code' => 9,
+                    'msg' => 'conv existed',
+                    'data' => $resultConv
+                ));
+            }
+        }
+        $createdAt =  new \MongoDate();
+        $data = array_merge(array(
+            'createdAt' => $createdAt,
+            'updatedAt' => $createdAt
+        ),$data);
+        try {
+            $result = $convModel->add($data);
+            if ($result) {
+                $cid = $convModel->getLastInsID();
+                return json_encode(array(
+                    'name' => $data['name'],
+                    'objectId' => $cid,
+                    'createdAt' => $createdAt
+                ));
+            }
+            else{
+                return '';
+            }
+        }catch (\Exception $e){
+            return json_encode(array(
+                'code' => -1,
+                'msg' => 'sys error',
+                'data' => $e->getMessage()
+            ));
+        }
+
+    }
 }
 
