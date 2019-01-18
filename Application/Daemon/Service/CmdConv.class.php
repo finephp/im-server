@@ -79,8 +79,8 @@ class CmdConv extends CmdBase {
     }
     /**
      * optype:7
-     * @param $genericCmd \GenericCommand
-     * @return \GenericCommand
+     * @param $genericCmd GenericCommand
+     * @return boolean
      */
     public function opQuery($genericCmd){
         $message = new \ConvCommand();
@@ -604,6 +604,11 @@ class CmdConv extends CmdBase {
         $this->pushClientQueue($resp);
         //查询数据库
         $result = $this->_getConversation($cid);
+
+        if($result['tr'] && !empty($_SERVER['GATEWAY_CLIENT_ID'])) {
+            Gateway::leaveGroup($_SERVER['GATEWAY_CLIENT_ID'],$cid);
+        }
+
         $new_m = self::getOnlineSession($result['m']);
         //  发送事件 40
         //1、memberleft 邀请者，被邀请者，其它人
