@@ -79,8 +79,8 @@ class CmdConv extends CmdBase {
     }
     /**
      * optype:7
-     * @param $genericCmd \GenericCommand
-     * @return \GenericCommand
+     * @param $genericCmd GenericCommand
+     * @return boolean
      */
     public function opQuery($genericCmd){
         $message = new \ConvCommand();
@@ -122,6 +122,19 @@ class CmdConv extends CmdBase {
         $data = $model->create($data);
         //查询是否有维一的成员组的聊天室
         $unique = $convMessage->getUnique();
+        //如果是暂态聊天室，且唯一，则只按名称查询
+        if($tr && $unique){
+            $resultConv = $model->where(array(
+                'unique' => true,
+                'tr' => true, //暂态聊天室
+                'name' => $data['name']
+                //'c'=>$creater,
+            ))->find();
+            if($resultConv){
+                $cid = $resultConv['_id'];
+                $m = $resultConv['m'];
+            }
+        }
         if(!$tr && $unique){
             $resultConv = $model->where(array(
                 'unique'=>true,
@@ -591,6 +604,11 @@ class CmdConv extends CmdBase {
         $this->pushClientQueue($resp);
         //查询数据库
         $result = $this->_getConversation($cid);
+
+        if($result['tr'] && !empty($_SERVER['GATEWAY_CLIENT_ID'])) {
+            Gateway::leaveGroup($_SERVER['GATEWAY_CLIENT_ID'],$cid);
+        }
+
         $new_m = self::getOnlineSession($result['m']);
         //  发送事件 40
         //1、memberleft 邀请者，被邀请者，其它人
